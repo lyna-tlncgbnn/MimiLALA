@@ -4,12 +4,12 @@
 
 把当前仓库逐步建设成一个可扩展的、基于 LangGraph 的完整 Agent 项目。
 
-项目建设原则：
+建设原则：
 
 1. 先搭稳定骨架
 2. 先跑通最小真实模型闭环
-3. 再逐步增加工具、会话、记忆、持久化和多入口能力
-4. 后续扩展都在既有框架内完成，不反复推倒重来
+3. 再逐步增加工具、会话、调试、持久化和更多入口
+4. 后续扩展都基于现有框架增量演进，而不是反复推倒重来
 
 ---
 
@@ -28,7 +28,7 @@
 
 `input -> build messages -> model -> conditional route -> tools -> model -> finalize output`
 
-后续扩展应在这条主链路基础上增量演进，而不是重写主流程。
+后续扩展都应在这条主链路基础上增量推进，而不是重写主流程。
 
 ---
 
@@ -42,14 +42,11 @@
 
 ### 实际完成情况
 
-已经完成：
-
 - 正式项目目录结构已建立
 - `CLI` 已成为唯一用户入口
 - `main.py` 已变成薄启动入口
 - `config.json` 已成为配置入口
 - 真实模型调用已通过 LangGraph 最小图跑通
-- `tools` / `memory` / `prompts` / `routes` 已建立边界文件
 
 ---
 
@@ -59,11 +56,9 @@
 
 ### Goal
 
-在现有骨架上实现最小 agent 闭环，把当前“单次模型调用”升级为“模型 + 工具 + 回到模型”的完整循环。
+把单次模型调用升级为最小 agent 回环。
 
 ### 实际完成情况
-
-已经完成：
 
 - 引入 `ToolNode`
 - 增加条件路由
@@ -81,18 +76,18 @@
 
 ### Goal
 
-增加会话和配置能力，让项目从“单轮 agent”变成“多轮可配置 agent”。
+增加默认短期 session，让项目从单轮 agent 升级为带短期上下文的最小框架。
 
 ### 实际完成情况
 
 - 增加默认短期 session
-- 将 session 历史保存到 `workspace/sessions/default.jsonl`
-- 让 CLI 自动读取并继续默认会话
-- 保持 `config.json` 仍只负责 `llm` 配置
+- session 历史保存到 `workspace/sessions/default.jsonl`
+- CLI 自动读取并继续默认会话
+- `config.json` 仍只负责 `llm` 配置
 
 ### Acceptance Criteria
 
-- 多轮对话能保留上下文
+- 多轮对话可以保留上下文
 - 默认 session 会自动创建和写回
 - 工具回环在加入 session 后仍然正常
 
@@ -100,24 +95,24 @@
 
 ## Phase 4 - Framework Hardening
 
-**Status:** TODO
+**Status:** DONE
 
 ### Goal
 
-把最小 agent 提升为“可持续扩展的框架”。
+把当前最小 agent 整理成更稳、更容易扩展和调试的学习型框架。
 
-### Deliverables
+### 实际完成情况
 
-- 统一 tool 注册和加载方式
-- 清晰的 system prompt 组织方式
-- 错误处理机制
-- 日志输出和调试模式
-- graph 构建流程规范化
+- 固定显式工具注册边界
+- 整理 `system prompt` 组织方式
+- 细化 model / tool / graph / session 错误边界
+- 增加 `config.json` 驱动的控制台调试模式
 
 ### Acceptance Criteria
 
 - 新增简单工具时不需要修改 graph 主链路
-- 常见错误有明确输出
+- 常见错误有更明确输出
+- `debug=true` 时可以看到关键执行步骤
 - 模块职责清晰，层次稳定
 
 ---
@@ -157,9 +152,9 @@
 1. Phase 1 已完成
 2. Phase 2 已完成
 3. Phase 3 已完成
-4. 下一步进入 Phase 4
-5. 不跳过框架加固直接做 memory 或 multi-agent
-6. 每一阶段完成后再更新下一阶段细节
+4. Phase 4 已完成
+5. 下一步进入 Phase 5
+6. 不跳过稳定骨架直接做复杂能力
 
 ---
 
@@ -180,7 +175,7 @@
 在早期阶段默认遵守：
 
 - 优先保证结构清晰，而不是功能堆积
-- 优先用官方推荐抽象，不自己发明复杂框架
+- 优先使用官方推荐抽象，不自己发明复杂框架
 - 优先用 CLI 验证能力，不先做 Web
 - 优先做短期会话，不先做长期记忆
 - 优先做单 agent，不先做多 agent
@@ -191,6 +186,6 @@
 
 当前应实施：
 
-**Phase 4 - Framework Hardening**
+**Phase 5 - Mature Project Expansion**
 
-目标是在已完成的最小 agent 与默认会话能力基础上，整理工具注册、提示组织、错误处理和调试边界。
+目标是在已完成的最小 agent、工具回环、默认 session 与调试边界基础上，开始增量引入更长期的持久化、更丰富的工具、更多入口和可观测能力。

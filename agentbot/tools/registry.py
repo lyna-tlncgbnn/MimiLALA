@@ -10,3 +10,8 @@ from agentbot.tools.basic import get_current_time, multiply
 def get_registered_tools() -> list[BaseTool]:
     """Return the tool list used by the current graph."""
     return [get_current_time, multiply]
+
+
+def get_registered_tool_names() -> list[str]:
+    """Return the registered tool names for debug output."""
+    return [tool.name for tool in get_registered_tools()]

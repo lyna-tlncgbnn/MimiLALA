@@ -19,6 +19,7 @@ class Settings:
     openai_base_url: str | None = None
     model: str = DEFAULT_MODEL
     temperature: float = DEFAULT_TEMPERATURE
+    debug: bool = False
 
     @classmethod
     def from_file(cls, path: Path | None = None) -> "Settings":
@@ -50,11 +51,16 @@ class Settings:
         except ValueError as exc:
             raise ValueError(f"{CONFIG_FILE_NAME} llm.temperature must be a number, got: {temperature_raw!r}") from exc
 
+        debug_raw = payload.get("debug", False)
+        if not isinstance(debug_raw, bool):
+            raise ValueError(f"{CONFIG_FILE_NAME} debug must be true or false.")
+
         return cls(
             openai_api_key=api_key,
             openai_base_url=base_url,
             model=model,
             temperature=temperature,
+            debug=debug_raw,
         )
 
     @staticmethod

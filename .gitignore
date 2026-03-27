@@ -13,4 +13,4 @@ wheels/
 config.json
 
 # Local store place
-workspace
+workspace/

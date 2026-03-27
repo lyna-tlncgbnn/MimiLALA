@@ -4,14 +4,14 @@ AgentBot is a LangGraph learning project that is being built toward a complete a
 
 ### Current phase
 
-The repository has completed `Phase 3 - Session And Config`.
+The repository has completed `Phase 4 - Framework Hardening`.
 
-Phase 3 goals:
+Phase 4 goals:
 
-1. keep the Phase 2 agent loop stable
-2. add a default short-term session
-3. persist local conversation history under `workspace/`
-4. let the CLI continue a previous conversation automatically
+1. keep the Phase 3 agent loop stable
+2. keep tool registration boundaries explicit
+3. make prompt and error boundaries easier to maintain
+4. add a console debug mode for learning and troubleshooting
 
 ### Config
 
@@ -24,14 +24,17 @@ Create a root `config.json` and fill in your model settings:
     "base_url": "https://your-openai-compatible-endpoint/v1",
     "model": "gpt-4.1-mini",
     "temperature": 0.1
-  }
+  },
+  "debug": false
 }
 ```
 
 If you use an OpenAI-compatible provider such as Alibaba, set its compatible `base_url`
 and the actual model name it expects.
 
-### Phase 2 capabilities
+Set `debug` to `true` when you want to see the agent's execution steps in the console.
+
+### Current capabilities
 
 The project now includes two tools:
 
@@ -40,7 +43,7 @@ The project now includes two tools:
 
 ### Workspace
 
-The project now stores local runtime data under:
+The project stores local runtime data under:
 
 ```text
 workspace/
@@ -49,6 +52,16 @@ workspace/
 ```
 
 The CLI automatically loads and saves the default session history from this file.
+
+### Debug mode
+
+When `debug` is `true`, the console shows a concise execution trace, including:
+
+- how many session messages were loaded
+- which tools are registered
+- whether the model emitted a tool call
+- which tool returned what
+- what the final answer was
 
 ### Run
 
@@ -80,14 +93,16 @@ Run these two commands one after another:
 .\.venv\Scripts\python.exe main.py "我刚刚叫什么名字？"
 ```
 
-### Phase 3 boundaries
+### Phase 4 boundaries
 
-Phase 3 intentionally does not include:
+Phase 4 intentionally does not include:
 
 - memory
 - API server
 - multi-agent orchestration
+- tracing platforms
+- checkpointing
 
 ### Next step
 
-The next planned stage is `Phase 4 - Framework Hardening`.
+The next planned stage is `Phase 5 - Mature Project Expansion`.
