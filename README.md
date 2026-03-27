@@ -4,14 +4,12 @@ AgentBot is a LangGraph learning project that is being built toward a complete a
 
 ### Current phase
 
-The repository has completed `Phase 4 - Framework Hardening`.
+The repository is now in `Phase 5 - Mature Project Expansion`.
 
-Phase 4 goals:
+The first Phase 5 slice focuses on two local data foundations:
 
-1. keep the Phase 3 agent loop stable
-2. keep tool registration boundaries explicit
-3. make prompt and error boundaries easier to maintain
-4. add a console debug mode for learning and troubleshooting
+1. conversation files with file-level `meta`
+2. execution logs stored alongside each conversation
 
 ### Config
 
@@ -32,14 +30,17 @@ Create a root `config.json` and fill in your model settings:
 If you use an OpenAI-compatible provider such as Alibaba, set its compatible `base_url`
 and the actual model name it expects.
 
-Set `debug` to `true` when you want to see the agent's execution steps in the console.
+`debug` now only controls whether execution events are also echoed to the console.
+Execution events themselves are persisted locally by default.
 
 ### Current capabilities
 
-The project now includes two tools:
+The project currently supports:
 
-- `get_current_time`
-- `multiply`
+- real model calls through LangGraph
+- tool calling with `get_current_time` and `multiply`
+- a default persistent conversation
+- local execution event logging
 
 ### Workspace
 
@@ -47,21 +48,37 @@ The project stores local runtime data under:
 
 ```text
 workspace/
-  sessions/
+  conversations/
+    default.jsonl
+  executions/
     default.jsonl
 ```
 
-The CLI automatically loads and saves the default session history from this file.
+`conversations/default.jsonl` stores one conversation as:
 
-### Debug mode
+- one `meta` record on the first line
+- followed by `message` records
 
-When `debug` is `true`, the console shows a concise execution trace, including:
+`executions/default.jsonl` stores:
 
-- how many session messages were loaded
-- which tools are registered
-- whether the model emitted a tool call
-- which tool returned what
-- what the final answer was
+- the same `meta` record shape on the first line
+- followed by `event` records
+
+Both files belong to the same conversation because their first-line `conversation_id` is identical.
+
+### Execution Logging
+
+Execution events are now written locally by default.
+
+Typical event types include:
+
+- `conversation_loaded`
+- `tools_registered`
+- `graph_started`
+- `tool_call_emitted`
+- `tool_completed`
+- `final_answer`
+- `run_failed`
 
 ### Run
 
@@ -84,7 +101,7 @@ Or run interactively:
 .\.venv\Scripts\python.exe main.py "13乘以7是多少"
 ```
 
-### Session example
+### Conversation example
 
 Run these two commands one after another:
 
@@ -93,16 +110,21 @@ Run these two commands one after another:
 .\.venv\Scripts\python.exe main.py "我刚刚叫什么名字？"
 ```
 
-### Phase 4 boundaries
+Then inspect:
 
-Phase 4 intentionally does not include:
+- `workspace/conversations/default.jsonl`
+- `workspace/executions/default.jsonl`
 
-- memory
+### Current boundaries
+
+The project still does not include:
+
 - API server
+- tracing platform integration
+- long-term memory
+- subgraphs
 - multi-agent orchestration
-- tracing platforms
-- checkpointing
 
 ### Next step
 
-The next planned stage is `Phase 5 - Mature Project Expansion`.
+The next recommended Phase 5 slice is richer tools on top of the new local data model.

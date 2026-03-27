@@ -8,7 +8,7 @@
 
 1. 先搭稳定骨架
 2. 先跑通最小真实模型闭环
-3. 再逐步增加工具、会话、调试、持久化和更多入口
+3. 再逐步增加工具、会话、执行日志、持久化和更多入口
 4. 后续扩展都基于现有框架增量演进，而不是反复推倒重来
 
 ---
@@ -28,133 +28,53 @@
 
 `input -> build messages -> model -> conditional route -> tools -> model -> finalize output`
 
-后续扩展都应在这条主链路基础上增量推进，而不是重写主流程。
-
 ---
 
 ## Phase 1 - Project Skeleton
 
 **Status:** DONE
 
-### Goal
-
-建立完整、可扩展的项目骨架，并完成第一版真实模型调用能力。
-
-### 实际完成情况
-
-- 正式项目目录结构已建立
-- `CLI` 已成为唯一用户入口
-- `main.py` 已变成薄启动入口
-- `config.json` 已成为配置入口
-- 真实模型调用已通过 LangGraph 最小图跑通
-
----
+已完成正式项目骨架、真实模型调用和 CLI 入口。
 
 ## Phase 2 - Minimal Agent Loop
 
 **Status:** DONE
 
-### Goal
-
-把单次模型调用升级为最小 agent 回环。
-
-### 实际完成情况
-
-- 引入 `ToolNode`
-- 增加条件路由
-- 增加两个简单工具：
-  - `get_current_time`
-  - `multiply`
-- 完成最小回环：
-  `user input -> model -> tools -> model -> final answer`
-
----
+已完成最小 agent 回环、`ToolNode`、条件路由和基础工具。
 
 ## Phase 3 - Session And Config
 
 **Status:** DONE
 
-### Goal
-
-增加默认短期 session，让项目从单轮 agent 升级为带短期上下文的最小框架。
-
-### 实际完成情况
-
-- 增加默认短期 session
-- session 历史保存到 `workspace/sessions/default.jsonl`
-- CLI 自动读取并继续默认会话
-- `config.json` 仍只负责 `llm` 配置
-
-### Acceptance Criteria
-
-- 多轮对话可以保留上下文
-- 默认 session 会自动创建和写回
-- 工具回环在加入 session 后仍然正常
-
----
+已完成默认短期会话和 `workspace/sessions/default.jsonl` 持久化。
 
 ## Phase 4 - Framework Hardening
 
 **Status:** DONE
 
-### Goal
-
-把当前最小 agent 整理成更稳、更容易扩展和调试的学习型框架。
-
-### 实际完成情况
-
-- 固定显式工具注册边界
-- 整理 `system prompt` 组织方式
-- 细化 model / tool / graph / session 错误边界
-- 增加 `config.json` 驱动的控制台调试模式
-
-### Acceptance Criteria
-
-- 新增简单工具时不需要修改 graph 主链路
-- 常见错误有更明确输出
-- `debug=true` 时可以看到关键执行步骤
-- 模块职责清晰，层次稳定
-
----
+已完成显式工具注册、prompt 组织、错误边界和控制台调试输出。
 
 ## Phase 5 - Mature Project Expansion
 
-**Status:** TODO
+**Status:** DOING
 
-### Goal
+### 当前已完成的第一步
 
-在稳定框架之上扩展成熟项目能力。
+- 引入 `workspace/conversations/default.jsonl`
+- 引入 `workspace/executions/default.jsonl`
+- 固定文件级 `meta`
+- 让 conversation 和 execution 通过同一个 `conversation_id` 对齐
+- 引入 `execution_id`，区分同一对话中的单次运行
+- 将 execution events 变成本地默认落地能力
 
-### Deliverables
+### 后续建议顺序
 
-- persistent session
-- checkpointer
-- long-term memory
-- richer tools
-- API server
-- web/frontend integration
-- subgraph
-- multi-agent
-- observability
-
-### Acceptance Criteria
-
-- 新能力通过新增节点、模块或入口接入
-- 不破坏前四阶段已经稳定的结构
-- 主链路仍保持一致
-
----
-
-## 实施顺序要求
-
-后续必须按阶段推进：
-
-1. Phase 1 已完成
-2. Phase 2 已完成
-3. Phase 3 已完成
-4. Phase 4 已完成
-5. 下一步进入 Phase 5
-6. 不跳过稳定骨架直接做复杂能力
+1. richer tools
+2. persistent conversation/checkpointer 强化
+3. API server
+4. execution log 展示层
+5. long-term memory
+6. subgraph / multi-agent
 
 ---
 
@@ -172,20 +92,17 @@
 
 ## 当前默认约束
 
-在早期阶段默认遵守：
-
 - 优先保证结构清晰，而不是功能堆积
 - 优先使用官方推荐抽象，不自己发明复杂框架
 - 优先用 CLI 验证能力，不先做 Web
-- 优先做短期会话，不先做长期记忆
 - 优先做单 agent，不先做多 agent
 
 ---
 
 ## 当前下一步
 
-当前应实施：
+当前建议继续推进：
 
-**Phase 5 - Mature Project Expansion**
+**Phase 5 - richer tools**
 
-目标是在已完成的最小 agent、工具回环、默认 session 与调试边界基础上，开始增量引入更长期的持久化、更丰富的工具、更多入口和可观测能力。
+也就是在已完成的 conversation / execution 本地数据模型上，开始增加更真实的工具能力。

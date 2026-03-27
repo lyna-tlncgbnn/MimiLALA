@@ -1,55 +1,49 @@
-"""Minimal console debug helpers for the learning project."""
+"""Console rendering for execution events."""
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from typing import Any
-
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
-from langchain_core.tools import BaseTool
 
 
 @dataclass(slots=True)
 class DebugPrinter:
-    """Print concise debug summaries when debug mode is enabled."""
+    """Print concise execution summaries when console debug is enabled."""
 
     enabled: bool = False
 
     def log(self, message: str) -> None:
         if self.enabled:
-            print(f"[debug] {message}")
+            rendered = f"[debug] {message}"
+            encoding = sys.stdout.encoding or "utf-8"
+            safe_rendered = rendered.encode(encoding, errors="replace").decode(
+                encoding, errors="replace"
+            )
+            print(safe_rendered)
 
-    def log_loaded_session(self, history: list[BaseMessage]) -> None:
-        self.log(f"loaded session: {len(history)} messages")
+    def log_event(self, event: dict[str, Any]) -> None:
+        if not self.enabled:
+            return
 
-    def log_registered_tools(self, tools: list[BaseTool]) -> None:
-        names = ", ".join(tool.name for tool in tools) or "(none)"
-        self.log(f"registered tools: {names}")
-
-    def log_graph_started(self) -> None:
-        self.log("graph execution started")
-
-    def log_new_messages(self, messages: list[BaseMessage]) -> None:
-        for message in messages:
-            if isinstance(message, AIMessage):
-                self.log("node=chatbot")
-                if message.tool_calls:
-                    for tool_call in message.tool_calls:
-                        self.log(
-                            "model emitted tool call: "
-                            f"{tool_call.get('name')}({self._format_tool_args(tool_call.get('args'))})"
-                        )
-                else:
-                    self.log(f"final answer: {self._summarize_content(message.content)}")
-            elif isinstance(message, ToolMessage):
-                self.log("node=tools")
-                tool_name = message.name or "unknown_tool"
-                self.log(
-                    f"tool {tool_name} returned: {self._summarize_content(message.content)}"
-                )
-
-    def log_failure(self, stage: str, exc: Exception) -> None:
-        self.log(f"{stage} failed: {exc}")
+        event_name = event.get("event")
+        if event_name == "conversation_loaded":
+            self.log(f"loaded conversation: {event.get('message_count', 0)} messages")
+        elif event_name == "tools_registered":
+            self.log(f"registered tools: {', '.join(event.get('tools', []))}")
+        elif event_name == "graph_started":
+            self.log("graph execution started")
+        elif event_name == "tool_call_emitted":
+            self.log(
+                "model emitted tool call: "
+                f"{event.get('tool')}({self._format_tool_args(event.get('args'))})"
+            )
+        elif event_name == "tool_completed":
+            self.log(f"tool {event.get('tool')} returned: {self._summarize_content(event.get('output'))}")
+        elif event_name == "final_answer":
+            self.log(f"final answer: {self._summarize_content(event.get('content'))}")
+        elif event_name == "run_failed":
+            self.log(f"{event.get('stage')} failed: {event.get('error')}")
 
     @staticmethod
     def _format_tool_args(raw_args: Any) -> str:
