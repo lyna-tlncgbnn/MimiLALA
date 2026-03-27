@@ -66,31 +66,43 @@
 
 ## Phase 2 - Minimal Agent Loop
 
-**Status:** TODO
+**Status:** DONE
 
 ### Goal
 
 在现有骨架上实现最小 agent 闭环，把当前“单次模型调用”升级为“模型 + 工具 + 回到模型”的完整循环。
 
-### Deliverables
+### 实际完成情况
+
+已经完成：
 
 - 引入 `ToolNode`
-- 增加 1 到 2 个简单工具
 - 增加条件路由
+- 增加两个简单工具：
+  - `get_current_time`
+  - `multiply`
 - 完成最小回环：
   `user input -> model -> tools -> model -> final answer`
 
-推荐第一批工具：
+### 当前验收结果
 
-- `get_current_time`
-- `multiply`
+已经验证：
 
-### Acceptance Criteria
+- `python main.py "现在几点了"` 可以触发时间工具
+- `python main.py "13乘以7是多少"` 可以触发乘法工具
+- 工具执行后，模型会继续生成最终答案
+- graph 已不再是线性图，而是最小 agent 回环
 
-- 模型可以根据用户输入决定是否调用工具
-- 工具结果会返回给模型
-- 模型能基于工具结果输出最终答案
-- CLI 中能观察到真实的最小 agent 回环
+### 当前实现边界
+
+这一阶段仍未实现：
+
+- session persistence
+- 多轮上下文
+- long-term memory
+- API server
+- multi-agent
+- 高风险工具
 
 ---
 
@@ -173,9 +185,10 @@
 后续必须按阶段推进：
 
 1. Phase 1 已完成
-2. 下一步进入 Phase 2
-3. 不跳过最小 agent 回环直接做 memory 或 multi-agent
-4. 每一阶段完成后再更新下一阶段细节
+2. Phase 2 已完成
+3. 下一步进入 Phase 3
+4. 不跳过 session 和配置增强直接做 memory 或 multi-agent
+5. 每一阶段完成后再更新下一阶段细节
 
 ---
 
@@ -207,6 +220,6 @@
 
 当前应实施：
 
-**Phase 2 - Minimal Agent Loop**
+**Phase 3 - Session And Config**
 
-目标是基于当前已完成的 Phase 1 骨架，引入最小工具能力和 agent 回环。
+目标是在已完成的最小 agent 回环基础上，补齐短期会话和配置能力。
