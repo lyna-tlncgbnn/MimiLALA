@@ -1,50 +1,131 @@
-## AgentBot
+# AgentBot 🤖
 
-AgentBot is a LangGraph learning project that is being built toward a complete agent framework.
+> A learning-first LangGraph agent project that is growing into a complete AI application framework.
 
-### Current phase
+AgentBot is a staged LangGraph project built to understand agent systems from the ground up: real model calls, tool routing, short-term conversation history, and local execution logs.
 
-The repository is now in `Phase 5 - Mature Project Expansion`.
+It is intentionally not a giant framework from day one. The project grows one clear capability at a time, while always staying runnable.
 
-The first Phase 5 slice focuses on two local data foundations:
+## ✨ Current Status
 
-1. conversation files with file-level `meta`
-2. execution logs stored alongside each conversation
+The first major stage of the project is now usable end to end:
 
-### Config
+- ✅ Real LLM calls through `langchain-openai`
+- ✅ LangGraph-based agent loop
+- ✅ Tool calling with conditional routing
+- ✅ Default persistent conversation
+- ✅ Local execution event logging
+- ✅ Interactive CLI chat loop
 
-Create a root `config.json` and fill in your model settings:
+### Currently implemented
+
+AgentBot can already:
+
+- chat with a real OpenAI-compatible model
+- decide whether to call a tool
+- execute tools and continue the model loop
+- remember recent conversation history through local files
+- store execution events for each conversation
+
+Current built-in tools:
+
+- `get_current_time`
+- `multiply`
+
+## 🧠 Project Structure
+
+```text
+agentbot/
+  app/          # CLI, runner, console debug rendering
+  config/       # config loading
+  graph/        # LangGraph builder, nodes, routing, state
+  memory/       # conversation + execution persistence
+  models/       # LLM factory
+  prompts/      # system prompt
+  tools/        # tool definitions and registry
+main.py         # thin entrypoint
+config.json     # local runtime config
+workspace/      # local runtime data
+plan/           # staged project roadmap
+```
+
+## 📦 Installation
+
+### Requirements
+
+- Python `3.11+`
+- An OpenAI-compatible model endpoint
+
+### Option 1: `uv` (recommended)
+
+```powershell
+uv sync
+```
+
+### Option 2: `venv + pip`
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -e .
+```
+
+## ⚙️ Configuration
+
+Create a root `config.json`:
 
 ```json
 {
   "llm": {
     "api_key": "your_api_key",
     "base_url": "https://your-openai-compatible-endpoint/v1",
-    "model": "gpt-4.1-mini",
+    "model": "your-model-name",
     "temperature": 0.1
   },
   "debug": false
 }
 ```
 
-If you use an OpenAI-compatible provider such as Alibaba, set its compatible `base_url`
-and the actual model name it expects.
+Notes:
 
-`debug` now only controls whether execution events are also echoed to the console.
-Execution events themselves are persisted locally by default.
+- `base_url` supports OpenAI-compatible providers such as Alibaba DashScope.
+- `debug` only controls whether execution events are echoed to the console.
+- Execution events themselves are persisted locally by default.
 
-### Current capabilities
+## 🚀 Run
 
-The project currently supports:
+### Single prompt
 
-- real model calls through LangGraph
-- tool calling with `get_current_time` and `multiply`
-- a default persistent conversation
-- local execution event logging
+```powershell
+.\.venv\Scripts\python.exe main.py "现在几点了"
+```
 
-### Workspace
+### Interactive mode
 
-The project stores local runtime data under:
+```powershell
+.\.venv\Scripts\python.exe main.py
+```
+
+Interactive mode keeps waiting for the next input after each turn.
+
+Exit commands:
+
+- `exit`
+- `quit`
+- `/exit`
+- `/quit`
+
+Replies are printed like this:
+
+```text
+You: 13乘以7是多少
+AgentBot:
+13乘以7等于91。
+```
+
+## 🗂️ Local Data
+
+AgentBot stores local runtime data under:
 
 ```text
 workspace/
@@ -54,23 +135,23 @@ workspace/
     default.jsonl
 ```
 
-`conversations/default.jsonl` stores one conversation as:
+### `conversations/default.jsonl`
+
+Stores one conversation as:
 
 - one `meta` record on the first line
 - followed by `message` records
 
-`executions/default.jsonl` stores:
+### `executions/default.jsonl`
 
-- the same `meta` record shape on the first line
+Stores:
+
+- the same conversation `meta` shape on the first line
 - followed by `event` records
 
-Both files belong to the same conversation because their first-line `conversation_id` is identical.
+These two files belong to the same conversation because their first-line `conversation_id` is the same.
 
-### Execution Logging
-
-Execution events are now written locally by default.
-
-Typical event types include:
+Typical execution events:
 
 - `conversation_loaded`
 - `tools_registered`
@@ -80,48 +161,46 @@ Typical event types include:
 - `final_answer`
 - `run_failed`
 
-### Run
-
-Pass a prompt directly:
-
-```powershell
-.\.venv\Scripts\python.exe main.py "你好"
-```
-
-Or run interactively:
-
-```powershell
-.\.venv\Scripts\python.exe main.py
-```
-
-Interactive mode now keeps waiting for the next input after each turn.
-Type `exit`, `quit`, `/exit`, or `/quit` to leave the loop.
-Replies are printed with the assistant label, for example: `AgentBot: ...`
-
-### Example prompts
+## 💬 Example Prompts
 
 ```powershell
 .\.venv\Scripts\python.exe main.py "现在几点了"
 .\.venv\Scripts\python.exe main.py "13乘以7是多少"
-```
-
-### Conversation example
-
-Run these two commands one after another:
-
-```powershell
 .\.venv\Scripts\python.exe main.py "我叫张三"
 .\.venv\Scripts\python.exe main.py "我刚刚叫什么名字？"
 ```
 
-Then inspect:
+## 🛣️ Roadmap
 
-- `workspace/conversations/default.jsonl`
-- `workspace/executions/default.jsonl`
+Completed:
 
-### Current boundaries
+- Phase 1: project skeleton
+- Phase 2: minimal agent loop
+- Phase 3: conversation persistence
+- Phase 4: framework hardening
+- Phase 5 (first slice): conversation meta + local execution logs
 
-The project still does not include:
+Next recommended direction:
+
+- richer tools
+- stronger persistence / checkpointer support
+- API server
+- execution log visualization
+- long-term memory
+- subgraphs / multi-agent
+
+## 🔬 Design Principles
+
+AgentBot follows a few simple principles:
+
+- keep the program runnable at every stage
+- prefer clear boundaries over premature abstraction
+- add one meaningful agent concept at a time
+- use local persistence to make behavior inspectable
+
+## 📌 Current Boundaries
+
+This project still does **not** include:
 
 - API server
 - tracing platform integration
@@ -129,6 +208,7 @@ The project still does not include:
 - subgraphs
 - multi-agent orchestration
 
-### Next step
+## 📘 Notes
 
-The next recommended Phase 5 slice is richer tools on top of the new local data model.
+This repository is intentionally educational as well as practical.  
+If you open the `plan/` directory, you can see how the project evolved phase by phase.
