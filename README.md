@@ -94,6 +94,10 @@ Or run interactively:
 .\.venv\Scripts\python.exe main.py
 ```
 
+Interactive mode now keeps waiting for the next input after each turn.
+Type `exit`, `quit`, `/exit`, or `/quit` to leave the loop.
+Replies are printed with the assistant label, for example: `AgentBot: ...`
+
 ### Example prompts
 
 ```powershell
