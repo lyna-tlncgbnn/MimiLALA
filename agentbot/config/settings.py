@@ -1,4 +1,4 @@
-"""Minimal config-backed settings for Phase 1."""
+"""Minimal config-backed settings loaded from config.json."""
 
 from __future__ import annotations
 

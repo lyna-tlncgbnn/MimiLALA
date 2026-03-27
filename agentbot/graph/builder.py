@@ -1,4 +1,4 @@
-"""Build the Phase 2 minimal agent loop."""
+"""Build the current minimal agent loop graph."""
 
 from __future__ import annotations
 

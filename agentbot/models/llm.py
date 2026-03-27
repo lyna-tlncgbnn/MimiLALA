@@ -8,7 +8,7 @@ from agentbot.config.settings import Settings
 
 
 def build_llm(settings: Settings) -> ChatOpenAI:
-    """Create the Phase 1 chat model."""
+    """Create the chat model from the current project settings."""
     return ChatOpenAI(
         api_key=settings.openai_api_key,
         base_url=settings.openai_base_url,

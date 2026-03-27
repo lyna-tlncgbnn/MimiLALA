@@ -1,4 +1,4 @@
-"""Minimal CLI entrypoint for Phase 1."""
+"""Minimal CLI entrypoint for the current learning stages."""
 
 from __future__ import annotations
 
@@ -25,4 +25,3 @@ def main(argv: list[str] | None = None) -> int:
     except AgentBotError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
-

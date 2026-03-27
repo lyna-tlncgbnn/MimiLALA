@@ -1,4 +1,4 @@
-"""Routing for the Phase 2 minimal agent loop."""
+"""Routing for the current minimal agent loop."""
 
 from __future__ import annotations
 

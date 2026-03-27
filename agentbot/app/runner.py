@@ -1,4 +1,4 @@
-"""Runner for one-shot Phase 1 execution."""
+"""Runner for single-turn CLI execution with persisted short-term session history."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from agentbot.config.settings import Settings
 from agentbot.graph.builder import build_graph
+from agentbot.memory.session import SessionStore
 from agentbot.models.llm import build_llm
 from agentbot.prompts.system import get_system_prompt
 
@@ -26,18 +27,27 @@ def run_once(user_text: str) -> str:
     except Exception as exc:
         raise AgentBotError(f"Failed to initialize chat model: {exc}") from exc
 
+    session_store = SessionStore()
+
     try:
+        history = session_store.load_default_session()
         graph = build_graph(llm)
         result = graph.invoke(
             {
                 "messages": [
                     SystemMessage(content=get_system_prompt()),
+                    *history,
                     HumanMessage(content=user_text),
                 ]
             }
         )
     except Exception as exc:
         raise AgentBotError(f"Graph execution failed: {exc}") from exc
+
+    try:
+        session_store.save_default_session(result["messages"])
+    except ValueError as exc:
+        raise AgentBotError(f"Failed to persist session history: {exc}") from exc
 
     return _extract_final_text(result["messages"])
 

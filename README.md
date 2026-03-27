@@ -4,14 +4,14 @@ AgentBot is a LangGraph learning project that is being built toward a complete a
 
 ### Current phase
 
-The repository is currently in `Phase 2 - Minimal Agent Loop`.
+The repository has completed `Phase 3 - Session And Config`.
 
-Phase 2 goals:
+Phase 3 goals:
 
-1. keep the Phase 1 project skeleton stable
-2. add the first real tools
-3. upgrade the graph from a single model call to a minimal agent loop
-4. let the model decide when to call tools and then answer from tool results
+1. keep the Phase 2 agent loop stable
+2. add a default short-term session
+3. persist local conversation history under `workspace/`
+4. let the CLI continue a previous conversation automatically
 
 ### Config
 
@@ -38,6 +38,18 @@ The project now includes two tools:
 - `get_current_time`
 - `multiply`
 
+### Workspace
+
+The project now stores local runtime data under:
+
+```text
+workspace/
+  sessions/
+    default.jsonl
+```
+
+The CLI automatically loads and saves the default session history from this file.
+
 ### Run
 
 Pass a prompt directly:
@@ -59,11 +71,23 @@ Or run interactively:
 .\.venv\Scripts\python.exe main.py "13乘以7是多少"
 ```
 
-### Phase 2 boundaries
+### Session example
 
-Phase 2 intentionally does not include:
+Run these two commands one after another:
 
-- session persistence
+```powershell
+.\.venv\Scripts\python.exe main.py "我叫张三"
+.\.venv\Scripts\python.exe main.py "我刚刚叫什么名字？"
+```
+
+### Phase 3 boundaries
+
+Phase 3 intentionally does not include:
+
 - memory
 - API server
 - multi-agent orchestration
+
+### Next step
+
+The next planned stage is `Phase 4 - Framework Hardening`.

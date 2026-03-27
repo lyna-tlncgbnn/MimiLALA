@@ -51,17 +51,6 @@
 - 真实模型调用已通过 LangGraph 最小图跑通
 - `tools` / `memory` / `prompts` / `routes` 已建立边界文件
 
-### 当前实现边界
-
-这一阶段仍未实现：
-
-- tool calling
-- session persistence
-- memory
-- API server
-- multi-agent
-- subgraph
-
 ---
 
 ## Phase 2 - Minimal Agent Loop
@@ -84,47 +73,28 @@
 - 完成最小回环：
   `user input -> model -> tools -> model -> final answer`
 
-### 当前验收结果
-
-已经验证：
-
-- `python main.py "现在几点了"` 可以触发时间工具
-- `python main.py "13乘以7是多少"` 可以触发乘法工具
-- 工具执行后，模型会继续生成最终答案
-- graph 已不再是线性图，而是最小 agent 回环
-
-### 当前实现边界
-
-这一阶段仍未实现：
-
-- session persistence
-- 多轮上下文
-- long-term memory
-- API server
-- multi-agent
-- 高风险工具
-
 ---
 
 ## Phase 3 - Session And Config
 
-**Status:** TODO
+**Status:** DONE
 
 ### Goal
 
 增加会话和配置能力，让项目从“单轮 agent”变成“多轮可配置 agent”。
 
-### Deliverables
+### 实际完成情况
 
-- 完善 `config.json` 的结构和配置管理
-- 增加短期 session 历史
-- 支持同一 session 下的多轮对话
+- 增加默认短期 session
+- 将 session 历史保存到 `workspace/sessions/default.jsonl`
+- 让 CLI 自动读取并继续默认会话
+- 保持 `config.json` 仍只负责 `llm` 配置
 
 ### Acceptance Criteria
 
 - 多轮对话能保留上下文
-- 模型和运行参数不再硬编码
-- CLI 可以显式指定或默认使用一个 session
+- 默认 session 会自动创建和写回
+- 工具回环在加入 session 后仍然正常
 
 ---
 
@@ -186,9 +156,10 @@
 
 1. Phase 1 已完成
 2. Phase 2 已完成
-3. 下一步进入 Phase 3
-4. 不跳过 session 和配置增强直接做 memory 或 multi-agent
-5. 每一阶段完成后再更新下一阶段细节
+3. Phase 3 已完成
+4. 下一步进入 Phase 4
+5. 不跳过框架加固直接做 memory 或 multi-agent
+6. 每一阶段完成后再更新下一阶段细节
 
 ---
 
@@ -220,6 +191,6 @@
 
 当前应实施：
 
-**Phase 3 - Session And Config**
+**Phase 4 - Framework Hardening**
 
-目标是在已完成的最小 agent 回环基础上，补齐短期会话和配置能力。
+目标是在已完成的最小 agent 与默认会话能力基础上，整理工具注册、提示组织、错误处理和调试边界。
