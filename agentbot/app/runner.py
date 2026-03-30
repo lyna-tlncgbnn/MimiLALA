@@ -42,9 +42,6 @@ def run_once(user_text: str) -> str:
     except Exception as exc:
         raise AgentBotError(f"Failed to load conversation history: {exc}") from exc
 
-    if meta is None:
-        meta = conversation_store.create_default_meta()
-
     execution_id = new_execution_id()
     events.append(
         build_event(
@@ -88,7 +85,7 @@ def run_once(user_text: str) -> str:
         events.append(failure_event)
         debug.log_event(failure_event)
         try:
-            execution_store.append_default_events(meta, events)
+            execution_store.append_events(meta, events)
         except Exception:
             pass
         raise AgentBotError(_format_graph_error(exc)) from exc
@@ -100,7 +97,11 @@ def run_once(user_text: str) -> str:
         debug.log_event(event)
 
     try:
-        conversation_store.save_default_conversation(meta, result["messages"])
+        meta = conversation_store.replace_conversation_messages(
+            meta.conversation_id,
+            result["messages"],
+            existing_meta=meta,
+        )
     except Exception as exc:
         failure_event = build_event(
             execution_id,
@@ -111,13 +112,13 @@ def run_once(user_text: str) -> str:
         events.append(failure_event)
         debug.log_event(failure_event)
         try:
-            execution_store.append_default_events(meta, events)
+            execution_store.append_events(meta, events)
         except Exception:
             pass
         raise AgentBotError(f"Failed to persist conversation history: {exc}") from exc
 
     try:
-        execution_store.append_default_events(meta, events)
+        execution_store.append_events(meta, events)
     except Exception as exc:
         raise AgentBotError(f"Failed to persist execution log: {exc}") from exc
 
