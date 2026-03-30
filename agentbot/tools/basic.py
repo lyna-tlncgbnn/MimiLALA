@@ -17,3 +17,6 @@ def get_current_time() -> str:
 def multiply(a: float, b: float) -> float:
     """Multiply two numbers and return the result."""
     return a * b
+
+
+TOOLS = [get_current_time, multiply]

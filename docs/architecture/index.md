@@ -24,3 +24,4 @@ AgentBot 目前是一个围绕单一 LangGraph loop 组织起来的小型 CLI �
 - `graph-flow.md`
 - `project-structure.md`
 - `persistence.md`
+- `tools.md`
