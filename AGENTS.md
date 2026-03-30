@@ -1,52 +1,68 @@
-# AGENTS.md
+# Agent 指南
 
-本仓库用于按递进方式实现 LangGraph Agent，并在这个过程中学习。优先保证每一步最小可运行，再逐步引入新概念。
+这个仓库是一个以学习为先、逐步演进的 LangGraph Agent 项目。
 
-## 项目目标
+## 如何使用这份文件
 
-把当前仓库逐步建设成一个可扩展的、基于 LangGraph 的完整 Agent 项目。这个项目的建设原则是：
+把这份文件当作仓库入口，而不是完整文档本体。
 
-- 先搭好稳定的工程骨架
-- 先跑通最小真实模型闭环
-- 再逐步增加工具、会话、记忆、持久化和多入口能力
-- 后续扩展都在既有框架内完成，而不是反复推倒重来
+更详细的项目信息请看：
 
-## 当前阶段
+- `README.md`：快速上手和当前能力概览
+- `docs/index.md`：文档总索引
+- `docs/product/roadmap.md`：产品方向和后续里程碑
+- `docs/architecture/index.md`：系统架构与数据流
+- `docs/exec-plans/active/`：当前正在执行的计划
+- `docs/exec-plans/completed/`：已完成阶段归档
+- `docs/decisions/`：关键技术决策
+- `.agents/skills/`：仓库级 Codex skills
 
-当前项目处于“按阶段实施”的搭建模式。
+## 当前目标
 
-执行要求：
+把这个项目逐步建设成一个可维护的 LangGraph Agent 工程，具备：
 
-- 每次只实现当前阶段对应的目标，不提前引入后续阶段复杂度
-- 每次大的plan执行之前，先看一下plan文件夹里面的各个文档，再次明确当前的阶段
-- 每完成一个阶段任务后，必须检查并同步更新相关文档
-- 文档更新应当和代码状态保持一致，不能出现“代码已完成但文档仍是旧状态”的情况
-
-需要同步检查的文档：
-- `plan/task.md`
-  总阶段路线图，记录当前整体进度和“下一步”阶段
-- plan文件夹下后续其他新增的每个阶段的md
-- `README.md`
-  面向运行和使用的说明；当入口、配置或运行方式变化时必须同步更新
-
-## 当前核心技术栈
-
-- Python 3.11+
-- `langgraph`
-- `langchain-core`
-- `langchain-openai`
+1. 真实模型调用
+2. tool routing
+3. 本地 conversation persistence
+4. execution event logging
+5. 继续向 richer tools、checkpointer 和更多入口扩展的空间
 
 ## 工作规则
-- 代码中的注释必须使用中文。
-- 对于不影响运行逻辑的轻量修改，不要为了“确认没问题”而默认补跑本地验证；优先根据改动范围判断影响，并保持最小操作。
-- 涉及 `langgraph`、`langchain` 的概念、API、参数、版本行为或指定计划的时候，必须使用已安装的 LangGraph MCP 工具进行查询！！！这条非常重要!!!!!!!!!
-- 代码应在关键步骤、核心逻辑以及不易直观理解的地方补充中文注释，但避免为显而易见的简单语句添加冗余注释。
-- 优先编写最小可运行、与当前需求直接对应的实现；不要为了假设中的未来场景提前加入额外兜底分支、兼容层或抽象。
-- 涉及错误处理时，只处理当前步骤中真实需要的问题；不要机械式加入大面积 defensive code。
-- 当前阶段优先清晰展示核心 LangGraph 概念，不要用额外封装隐藏图结构、状态流转或节点逻辑。
-- 提交修改前，自检是否引入了当前需求未要求的 fallback、helper、抽象层或配置项；如有，优先删除。
 
-## 不要做的事
+- 优先做小步、可运行的改动，不做大范围重构。
+- 保持主流程可读、可检查。
+- 只有在当前代码真的需要时，才引入新的抽象。
+- 代码行为、结构或工作流变化后，要同步更新文档。
+- 项目级 skills 统一放在 `./.agents/skills`。
 
-- 不要因为“以后可能会用到”而提前提取通用工具函数、基类、配置层或多态结构。
-- 在输入契约明确时，不要额外添加未经需求说明的默认值、降级路径、兼容旧逻辑或兜底分支。
+## 当前边界
+
+这个仓库目前还不包含：
+
+- API server
+- long-term memory
+- checkpointer
+- tracing platform integration
+- subgraph
+- multi-agent orchestration
+- 自动化测试
+
+## 常用命令
+
+安装依赖：
+
+```powershell
+uv sync
+```
+
+运行 CLI：
+
+```powershell
+.\.venv\Scripts\python.exe main.py
+```
+
+运行单条输入：
+
+```powershell
+.\.venv\Scripts\python.exe main.py "what time is it?"
+```

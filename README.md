@@ -1,68 +1,69 @@
-# AgentBot 🤖
+# AgentBot
 
-> A learning-first LangGraph agent project that is growing into a complete AI application framework.
+> 一个以学习为先、逐步成长为完整 AI 应用框架的 LangGraph Agent 项目。
 
-AgentBot is a staged LangGraph project built to understand agent systems from the ground up: real model calls, tool routing, short-term conversation history, and local execution logs.
+AgentBot 是一个分阶段推进的 LangGraph 项目，用来从底层理解 Agent 系统是如何工作的：真实模型调用、tool routing、短期对话历史，以及本地 execution logs。
 
-It is intentionally not a giant framework from day one. The project grows one clear capability at a time, while always staying runnable.
+它不是一开始就做成“大而全”的框架，而是一次只增加一个清晰能力，并始终保持项目可运行。
 
-## ✨ Current Status
+## 当前状态
 
-The first major stage of the project is now usable end to end:
+项目的第一大阶段已经可以端到端运行。
 
-- ✅ Real LLM calls through `langchain-openai`
-- ✅ LangGraph-based agent loop
-- ✅ Tool calling with conditional routing
-- ✅ Default persistent conversation
-- ✅ Local execution event logging
-- ✅ Interactive CLI chat loop
+- 通过 `langchain-openai` 进行真实 LLM 调用
+- 基于 LangGraph 的 agent loop
+- 带条件路由的 tool calling
+- 默认 conversation persistence
+- 本地 execution event logging
+- 可交互的 CLI chat loop
 
-### Currently implemented
+### 当前已经实现
 
-AgentBot can already:
+AgentBot 目前已经可以：
 
-- chat with a real OpenAI-compatible model
-- decide whether to call a tool
-- execute tools and continue the model loop
-- remember recent conversation history through local files
-- store execution events for each conversation
+- 通过 OpenAI-compatible 接口与真实模型对话
+- 判断是否需要调用工具
+- 执行工具后继续回到模型生成最终结果
+- 通过本地文件记住最近对话历史
+- 为每次会话保存 execution events
 
-Current built-in tools:
+当前内置工具：
 
 - `get_current_time`
 - `multiply`
 
-## 🧠 Project Structure
+## 项目结构
 
 ```text
 agentbot/
-  app/          # CLI, runner, console debug rendering
-  config/       # config loading
-  graph/        # LangGraph builder, nodes, routing, state
-  memory/       # conversation + execution persistence
-  models/       # LLM factory
+  app/          # CLI、runner、控制台 debug 输出
+  config/       # 配置读取与校验
+  graph/        # LangGraph builder、nodes、routes、state
+  memory/       # conversation 与 execution 持久化
+  models/       # LLM 构造
   prompts/      # system prompt
-  tools/        # tool definitions and registry
-main.py         # thin entrypoint
-config.json     # local runtime config
-workspace/      # local runtime data
-plan/           # staged project roadmap
+  tools/        # 工具定义与注册
+docs/           # roadmap、architecture、plans、decisions、runbooks
+.agents/skills/ # 仓库级 Codex skills
+main.py         # 薄入口
+config.json     # 本地运行配置
+workspace/      # 本地运行数据
 ```
 
-## 📦 Installation
+## 安装
 
-### Requirements
+### 环境要求
 
 - Python `3.11+`
-- An OpenAI-compatible model endpoint
+- 一个 OpenAI-compatible model endpoint
 
-### Option 1: `uv` (recommended)
+### 方式一：`uv`（推荐）
 
 ```powershell
 uv sync
 ```
 
-### Option 2: `venv + pip`
+### 方式二：`venv + pip`
 
 ```powershell
 python -m venv .venv
@@ -70,9 +71,9 @@ python -m venv .venv
 pip install -e .
 ```
 
-## ⚙️ Configuration
+## 配置
 
-Create a root `config.json`:
+在仓库根目录创建 `config.json`：
 
 ```json
 {
@@ -86,46 +87,46 @@ Create a root `config.json`:
 }
 ```
 
-Notes:
+说明：
 
-- `base_url` supports OpenAI-compatible providers such as Alibaba DashScope.
-- `debug` only controls whether execution events are echoed to the console.
-- Execution events themselves are persisted locally by default.
+- `base_url` 支持 OpenAI-compatible provider，例如 Alibaba DashScope。
+- `debug` 只控制是否把 execution events 摘要打印到控制台。
+- execution events 本身默认仍会落盘保存。
 
-## 🚀 Run
+## 运行
 
-### Single prompt
+### 单条输入
 
 ```powershell
-.\.venv\Scripts\python.exe main.py "现在几点了"
+.\.venv\Scripts\python.exe main.py "what time is it?"
 ```
 
-### Interactive mode
+### 交互模式
 
 ```powershell
 .\.venv\Scripts\python.exe main.py
 ```
 
-Interactive mode keeps waiting for the next input after each turn.
+交互模式下，每轮回复后会继续等待下一条输入。
 
-Exit commands:
+退出命令：
 
 - `exit`
 - `quit`
 - `/exit`
 - `/quit`
 
-Replies are printed like this:
+输出示例：
 
 ```text
-You: 13乘以7是多少
+You: what is 13 times 7?
 AgentBot:
-13乘以7等于91。
+13 times 7 equals 91.
 ```
 
-## 🗂️ Local Data
+## 本地数据
 
-AgentBot stores local runtime data under:
+AgentBot 会把本地运行数据写到：
 
 ```text
 workspace/
@@ -137,21 +138,21 @@ workspace/
 
 ### `conversations/default.jsonl`
 
-Stores one conversation as:
+用于保存一条 conversation：
 
-- one `meta` record on the first line
-- followed by `message` records
+- 第一行是一个 `meta` record
+- 后续每一行是一个 `message` record
 
 ### `executions/default.jsonl`
 
-Stores:
+用于保存执行事件：
 
-- the same conversation `meta` shape on the first line
-- followed by `event` records
+- 第一行是同一个 conversation 的 `meta` record
+- 后续每一行是一个 `event` record
 
-These two files belong to the same conversation because their first-line `conversation_id` is the same.
+这两个文件属于同一个 conversation，因为它们第一行中的 `conversation_id` 是一致的。
 
-Typical execution events:
+常见 execution events 包括：
 
 - `conversation_loaded`
 - `tools_registered`
@@ -161,54 +162,52 @@ Typical execution events:
 - `final_answer`
 - `run_failed`
 
-## 💬 Example Prompts
+## 示例输入
 
 ```powershell
-.\.venv\Scripts\python.exe main.py "现在几点了"
-.\.venv\Scripts\python.exe main.py "13乘以7是多少"
-.\.venv\Scripts\python.exe main.py "我叫张三"
-.\.venv\Scripts\python.exe main.py "我刚刚叫什么名字？"
+.\.venv\Scripts\python.exe main.py "what time is it?"
+.\.venv\Scripts\python.exe main.py "what is 13 times 7?"
+.\.venv\Scripts\python.exe main.py "my name is Tom"
+.\.venv\Scripts\python.exe main.py "what is my name?"
 ```
 
-## 🛣️ Roadmap
+## Roadmap
 
-Completed:
+已经完成：
 
-- Phase 1: project skeleton
-- Phase 2: minimal agent loop
-- Phase 3: conversation persistence
-- Phase 4: framework hardening
-- Phase 5 (first slice): conversation meta + local execution logs
+- Phase 1：project skeleton
+- Phase 2：minimal agent loop
+- Phase 3：default conversation persistence
+- Phase 4：framework hardening
+- Phase 5：conversation meta 和 local execution logs
 
-Next recommended direction:
+下一步建议方向：
 
 - richer tools
-- stronger persistence / checkpointer support
+- 更强的 persistence 与 checkpointer 支持
 - API server
 - execution log visualization
 - long-term memory
-- subgraphs / multi-agent
+- subgraph 与 multi-agent
 
-## 🔬 Design Principles
+更完整的结构化项目文档请从 `docs/index.md` 开始看。
 
-AgentBot follows a few simple principles:
+## 设计原则
 
-- keep the program runnable at every stage
-- prefer clear boundaries over premature abstraction
-- add one meaningful agent concept at a time
-- use local persistence to make behavior inspectable
+AgentBot 遵循几条简单原则：
 
-## 📌 Current Boundaries
+- 每个阶段都保持项目可运行
+- 优先保持清晰边界，而不是过早抽象
+- 一次只增加一个有意义的 Agent 能力
+- 优先使用本地可检查的数据，让运行行为可观察
 
-This project still does **not** include:
+## 当前边界
+
+这个项目目前还不包含：
 
 - API server
 - tracing platform integration
 - long-term memory
-- subgraphs
+- subgraph
 - multi-agent orchestration
-
-## 📘 Notes
-
-This repository is intentionally educational as well as practical.  
-If you open the `plan/` directory, you can see how the project evolved phase by phase.
+- 自动化测试
