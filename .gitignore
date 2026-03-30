@@ -14,3 +14,14 @@ config.json
 
 # Local store place
 workspace/
+
+# ui
+ui/dist/
+ui/node_modules/
+ui/*.tsbuildinfo
+ui/vite.config.js
+ui/vite.config.d.ts
+
+# desktop
+desktop/dist/
+desktop/node_modules/

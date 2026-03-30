@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f7f5;
+  --foreground: #232427;
+  --panel: #fcfcfa;
+  --panel-strong: #f2f2ef;
+  --panel-muted: #ecece8;
+  --border: rgba(36, 38, 42, 0.1);
+  --accent: #b46a2c;
+  --accent-foreground: #fff8f1;
+  --muted-foreground: #7a7e86;
+  --ring: rgba(180, 106, 44, 0.34);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-panel: var(--panel);
+  --color-panel-strong: var(--panel-strong);
+  --color-panel-muted: var(--panel-muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-ring: var(--ring);
+  --font-sans: "Segoe UI Variable Text", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-mono: "Cascadia Mono", "IBM Plex Mono", "Consolas", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background:
+    radial-gradient(circle at top center, rgba(226, 165, 101, 0.1), transparent 28%),
+    radial-gradient(circle at right 18%, rgba(234, 192, 147, 0.07), transparent 16%),
+    linear-gradient(180deg, #fbfbfa 0%, #f7f7f5 52%, #f2f2ef 100%);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(180, 106, 44, 0.14);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.noise-overlay {
+  position: relative;
+}
+
+.noise-overlay::before {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 36px 36px;
+  content: "";
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent);
+}
+
+.markdown-content pre {
+  margin: 0;
+}

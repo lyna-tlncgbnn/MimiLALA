@@ -1,0 +1,14 @@
+{
+  "name": "agentbot-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron electron/main.js",
+    "build": "node -e \"console.log('Desktop shell uses direct JS runtime files; no build step required right now.')\""
+  },
+  "dependencies": {
+    "electron": "^37.3.1"
+  }
+}

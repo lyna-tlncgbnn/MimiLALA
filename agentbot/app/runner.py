@@ -18,7 +18,7 @@ class AgentBotError(RuntimeError):
     """User-facing runtime error."""
 
 
-def run_once(user_text: str) -> str:
+def run_once(user_text: str, conversation_id: str | None = None) -> str:
     """Run a single LangGraph turn and return the assistant response."""
     try:
         settings = Settings.from_file()
@@ -38,7 +38,7 @@ def run_once(user_text: str) -> str:
     events: list[dict] = []
 
     try:
-        meta, history = conversation_store.load_default_conversation()
+        meta, history = _load_target_conversation(conversation_store, conversation_id)
     except Exception as exc:
         raise AgentBotError(f"Failed to load conversation history: {exc}") from exc
 
@@ -123,6 +123,15 @@ def run_once(user_text: str) -> str:
         raise AgentBotError(f"Failed to persist execution log: {exc}") from exc
 
     return _extract_final_text(result["messages"])
+
+
+def _load_target_conversation(
+    conversation_store: ConversationStore,
+    conversation_id: str | None,
+):
+    if conversation_id:
+        return conversation_store.get_conversation(conversation_id)
+    return conversation_store.load_default_conversation()
 
 
 def _extract_final_text(messages: list) -> str:
