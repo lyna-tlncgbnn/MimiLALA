@@ -1,7 +1,8 @@
+import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-export function MessageContent({
+function MessageContentInner({
   content,
   mode = "plain",
 }: {
@@ -63,3 +64,5 @@ export function MessageContent({
     </div>
   );
 }
+
+export const MessageContent = memo(MessageContentInner);

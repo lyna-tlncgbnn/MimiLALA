@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { memo, useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Copy, Hammer, Search, Sparkles } from "lucide-react";
 
 import { MessageContent } from "@/components/chat/message-content";
@@ -28,7 +28,7 @@ const COLLAPSE_CONFIG = {
   }
 >;
 
-export function MessageCard({
+function MessageCardInner({
   role,
   title,
   main,
@@ -270,6 +270,35 @@ export function MessageCard({
     </article>
   );
 }
+
+function areToolCallsEqual(previous: ToolCallPayload[], next: ToolCallPayload[]) {
+  if (previous === next) {
+    return true;
+  }
+
+  if (previous.length !== next.length) {
+    return false;
+  }
+
+  return previous.every((toolCall, index) => {
+    const nextToolCall = next[index];
+    return (
+      toolCall.id === nextToolCall.id &&
+      toolCall.name === nextToolCall.name &&
+      JSON.stringify(toolCall.args ?? null) === JSON.stringify(nextToolCall.args ?? null)
+    );
+  });
+}
+
+export const MessageCard = memo(MessageCardInner, (previousProps, nextProps) => {
+  return (
+    previousProps.role === nextProps.role &&
+    previousProps.title === nextProps.title &&
+    previousProps.main === nextProps.main &&
+    previousProps.timestamp === nextProps.timestamp &&
+    areToolCallsEqual(previousProps.toolCalls ?? [], nextProps.toolCalls ?? [])
+  );
+});
 
 function getToolCallName(toolCall: ToolCallPayload) {
   return typeof toolCall.name === "string" && toolCall.name.trim() ? toolCall.name : "unknown_tool";
