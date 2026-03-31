@@ -14,6 +14,7 @@
 - `docs/architecture/index.md`：系统架构总览
 - `docs/exec-plans/active/`：当前正在执行的计划
 - `docs/exec-plans/completed/`：已完成阶段归档
+- `docs/exec-detail/`：执行完成后的实施总结
 - `docs/decisions/`：关键技术决策
 - `.agents/skills/`：仓库级 Codex skills
 
@@ -26,7 +27,7 @@
 3. FastAPI 本地服务
 4. Python Agent 核心
 
-也就是说，它已经不再只是一个 CLI 工具。
+在聊天主链路上，桌面端已经具备基于 `SSE` 的 streaming chat。
 
 ## 当前目标
 
@@ -37,7 +38,8 @@
 3. 本地 conversation persistence
 4. execution event logging
 5. 可扩展的桌面应用结构
-6. 继续向 execution 可视化、streaming 和更完整桌面体验扩展的空间
+6. 基于 `SSE` 的流式聊天体验
+7. 继续向 execution 可视化、更完整 streaming 和更完整桌面体验扩展的空间
 
 ## 工作规则
 
@@ -54,7 +56,6 @@
 
 - checkpointer
 - long-term memory
-- streaming
 - execution 可视化面板
 - subgraph
 - multi-agent orchestration

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from agentbot.app.runner import run_once
+from agentbot.app.streaming_runner import stream_once
 from agentbot.services.conversations import ConversationService
 
 
@@ -16,3 +17,6 @@ class ChatService:
         reply = run_once(user_text, conversation_id=conversation_id)
         meta, messages = self.conversation_service.get_conversation(conversation_id)
         return meta, messages, reply
+
+    def stream_message_to_conversation(self, conversation_id: str, user_text: str):
+        return stream_once(user_text, conversation_id=conversation_id)

@@ -60,7 +60,8 @@ desktop/
 - 用户输入
 - 会话创建、切换、重命名、删除
 - Markdown 消息渲染
-- 与本地 FastAPI 的 HTTP 通信
+- 非流式与流式 API 调用
+- streaming 状态的界面反馈
 
 它不负责：
 
@@ -93,12 +94,13 @@ desktop/
 - conversation 详情
 - conversation CRUD
 - send message
+- stream message
 
 这样做的好处是：
 
 - 前端与 Agent 核心逻辑解耦
 - Electron 与前端之间不需要直接共享复杂业务逻辑
-- 后续如果继续做 API server，这一层可以自然扩展
+- 后续如果继续增强 API server，这一层可以自然扩展
 
 ## 前端运行方式
 
@@ -115,14 +117,9 @@ desktop/
 - React UI 地址：`http://127.0.0.1:5173`
 - FastAPI 地址：`http://127.0.0.1:8000`
 
-生产构建方向上：
-
-- `ui/` 负责产出静态前端资源
-- `desktop/` 负责加载这些资源并作为桌面应用壳
-
 ## 页面组织
 
-当前 React 页面只保留一个主页面结构。
+当前 React 页面围绕单个主界面展开。
 
 路由定义在：
 
@@ -133,7 +130,7 @@ desktop/
 - `/`
 - `/conversations/:conversationId`
 
-虽然有路由参数，但本质仍然是同一个桌面主界面，只是切换不同 conversation。
+本质上仍然是同一个桌面主界面，只是切换不同 conversation。
 
 ## 核心页面骨架
 
@@ -168,66 +165,28 @@ desktop/
 负责：
 
 - 展示消息历史
-- 空状态展示
+- 展示空状态
 - 输入框
 - 发送按钮
 - 错误提示
+- streaming 状态显示
 
-当前没有右侧详情面板或任务面板。
-
-## UI 设计方向
-
-当前前端样式参考了 `F:\nanobot\ui` 的整体视觉语言，但收敛为更简单的桌面聊天布局。
-
-主要特点包括：
-
-- 米白背景与浅层渐变
-- 浅棕色强调色
-- 左侧窄边栏与展开侧栏双态
-- 中间聊天面板
-- 轻卡片、细边框、低对比背景层级
-
-全局样式位于：
-
-- `ui/src/styles.css`
-
-其中定义了主要设计 token：
-
-- `--background`
-- `--foreground`
-- `--panel`
-- `--panel-strong`
-- `--panel-muted`
-- `--border`
-- `--accent`
-- `--accent-foreground`
-- `--muted-foreground`
-- `--ring`
-
-这些变量构成了当前前端的视觉基础。
+当前仍没有 execution 可视化面板或右侧详情面板。
 
 ## 状态管理
 
-当前前端状态分为两类：
+当前前端状态分为三类：
 
 ### 1. 远程数据状态
 
-由 `@tanstack/react-query` 管理。
-
-主要负责：
+由 `@tanstack/react-query` 管理，负责：
 
 - 会话列表查询
 - 单个会话详情查询
 - 创建会话
 - 重命名会话
 - 删除会话
-- 发送消息
-
-优点是：
-
-- 请求生命周期清晰
-- 缓存与失效策略统一
-- mutation 完成后可以自然刷新对应 query
+- 非流式消息发送后的缓存刷新
 
 ### 2. 本地 UI 状态
 
@@ -243,7 +202,17 @@ desktop/
 - `settingsOpen`
 - `renameTargetId`
 
-这类状态属于纯界面控制，不需要进入远程缓存层。
+### 3. 临时流式状态
+
+streaming chat 主链路不再只依赖后端最终 `messages`，而是维护临时消息层，用来承载：
+
+- optimistic user message
+- waiting assistant 占位
+- streaming assistant message
+- tool running 状态
+- tool 结果消息
+
+在流结束后，这些临时状态会被最终 conversation 数据覆盖。
 
 ## API 访问层
 
@@ -251,10 +220,11 @@ desktop/
 
 - `ui/src/lib/api.ts`
 
-这层负责两件事：
+这层负责：
 
 1. 统一发起 `fetch`
 2. 用 `zod` 校验返回结构
+3. 解析 `SSE` 事件流
 
 当前已经定义的主要 API 方法包括：
 
@@ -264,16 +234,9 @@ desktop/
 - `renameConversation()`
 - `deleteConversation()`
 - `sendMessage()`
-
-这样做的意义是：
-
-- UI 组件不直接拼接请求路径和校验逻辑
-- 响应结构异常时可以尽早暴露问题
-- 前端组件消费的是稳定的 TypeScript 类型
+- `streamMessage()`
 
 ## 数据流
-
-当前前端主数据流如下：
 
 ### 会话列表
 
@@ -282,23 +245,25 @@ desktop/
 3. `SidebarPanel` 消费格式化后的会话列表
 4. 用户点击某个会话后，路由切换到对应 `conversationId`
 
-### 会话详情
+### 非流式会话详情
 
 1. `AppShell` 根据当前路由参数确定 `activeConversationId`
 2. 调用 `getConversation(conversationId)`
 3. `ChatPanel` 渲染消息列表
 
-### 发送消息
+### 流式发送消息
 
 1. 用户在 `ChatPanel` 输入内容
-2. `AppShell` 调用 `sendMessage(conversationId, content)`
-3. 后端返回最新 conversation 状态与 reply
-4. React Query 更新当前 conversation cache
-5. 同时刷新 conversation 列表，确保 `updated_at` 排序同步
+2. `AppShell` 调用 `streamMessage(conversationId, content)`
+3. 前端先插入 optimistic user message，并清空输入框
+4. 接收 `assistant_waiting` 后显示等待状态
+5. 接收 `assistant_delta` 后持续追加 assistant 文本
+6. 如果收到 `tool_started` / `tool_finished`，则更新 tool 状态与结果
+7. 收到 `conversation_committed` / `done` 后重新拉取最终 conversation
 
 ## 消息渲染
 
-消息展示拆成了两层：
+消息显示拆成了两层：
 
 - `message-card.tsx`
 - `message-content.tsx`
@@ -311,6 +276,7 @@ desktop/
 - 角色样式
 - 卡片宽度
 - 边框和背景层级
+- waiting / tool running 等状态样式
 
 ### `message-content.tsx`
 
@@ -344,7 +310,7 @@ preload 位于：
 
 - `desktop/electron/preload.js`
 
-当前 preload 只暴露了最小桥接能力，没有承担业务逻辑。
+当前 preload 只暴露最小桥接能力，没有承担业务逻辑。
 
 这意味着：
 
@@ -359,7 +325,8 @@ preload 位于：
 - FastAPI 本地服务接口可以工作
 - Electron 窗口可以实际启动
 - Electron 可以加载当前 React 页面
-- 用户已对首版会话相关功能做过基础手动验证
+- 会话 CRUD 主链路可用
+- streaming chat 主链路可用
 
 ## 当前边界
 
@@ -368,25 +335,16 @@ preload 位于：
 - 浏览器版独立产品
 - 多窗口 UI
 - execution 可视化面板
-- streaming 消息渲染
 - 复杂设置系统
 - 直接操作 Python 本地文件
 - MCP、browser、shell 等高级交互界面
-
-这些内容后续可以继续扩展，但当前阶段只保证桌面应用基础链路最小可用。
 
 ## 当前可扩展方向
 
 在当前架构下，后续最自然的扩展方向包括：
 
 - 增加 execution 日志页面
-- 增加消息发送中的 streaming 体验
+- 增加更完整的 streaming 体验
 - 增加更完整的 settings 面板
 - 增加 conversation 搜索与筛选
-- 增加更丰富的消息卡片展示
-
-当前分层已经为这些扩展留出了空间：
-
-- 业务 API 在 `agentbot/api/`
-- 页面与组件在 `ui/src/components/`
-- 桌面壳在 `desktop/`
+- 增加更丰富的消息卡片显示

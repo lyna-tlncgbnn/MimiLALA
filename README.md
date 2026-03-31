@@ -4,7 +4,7 @@
 
 AgentBot 最初是一个分阶段推进的 LangGraph 学习项目，用来从底层理解 Agent 系统是如何工作的：真实模型调用、tool routing、短期对话历史，以及本地 execution logs。
 
-目前它已经不再只是一个 CLI demo，而是演进为一个带有本地 API、React 前端和 Electron 桌面壳的桌面应用雏形。
+目前它已经不再只是一个 CLI demo，而是演进成了一个带有本地 API、React 前端、Electron 桌面壳，以及流式聊天链路的桌面应用雏形。
 
 ## 当前状态
 
@@ -19,6 +19,7 @@ AgentBot 最初是一个分阶段推进的 LangGraph 学习项目，用来从底
 - FastAPI 本地服务入口
 - React 前端工程骨架
 - Electron 桌面壳
+- 基于 `SSE` 的 streaming chat 主链路
 
 ### 当前已经实现
 
@@ -31,8 +32,12 @@ AgentBot 最初是一个分阶段推进的 LangGraph 学习项目，用来从底
 - 在 persistence 内核中支持多个 conversation
 - 通过本地 API 完成 conversation CRUD
 - 在桌面端展示会话列表和聊天界面
+- 在桌面端进行流式聊天
+- 发送后立即显示 user 消息
+- 在 assistant 等待和 tool 执行期间展示明确状态
+- 以增量形式持续显示 assistant 回复
 
-当前内置工具包括：
+当前内置 tools 包括：
 
 - `get_current_time`
 - `multiply`
@@ -50,7 +55,7 @@ ui/              # React 前端
 agentbot/        # Python 后端核心
 docs/            # roadmap、architecture、plans、decisions、runbooks
 .agents/skills/  # 仓库级 Codex skills
-main.py          # CLI 薄入口
+main.py          # CLI 入口
 config.json      # 本地运行配置
 workspace/       # 本地运行数据
 ```
@@ -66,7 +71,7 @@ workspace/       # 本地运行数据
 ### 环境要求
 
 - Python `3.11+`
-- Node.js 与 npm
+- Node.js 与 `npm`
 - 一个 OpenAI-compatible model endpoint
 
 ### Python 依赖
@@ -186,11 +191,12 @@ workspace/
 - richer tools
 - multi-conversation persistence
 - desktop app foundation
+- streaming chat phase 1
 
 下一步建议方向：
 
 - execution log visualization
-- streaming 交互体验
+- 更完整的 streaming 体验
 - 更完整的桌面设置与调试能力
 - long-term memory
 - subgraph 或 multi-agent 实验
@@ -212,7 +218,6 @@ AgentBot 遵循几条简单原则：
 
 - checkpointer
 - long-term memory
-- streaming
 - execution 可视化面板
 - subgraph
 - multi-agent orchestration

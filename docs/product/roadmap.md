@@ -12,8 +12,9 @@
 - richer tools
 - multi-conversation persistence
 - desktop app foundation
+- streaming chat phase 1
 
-其中最近完成的两个阶段是：
+其中最近完成的几个阶段是：
 
 ### multi-conversation persistence
 
@@ -35,26 +36,35 @@
 - Electron 桌面壳
 - 本地桌面端到后端的基础联通链路
 
+### streaming chat phase 1
+
+已经完成：
+
+- 基于 `SSE` 的流式聊天接口
+- optimistic user message
+- assistant waiting / assistant streaming 状态
+- tool started / tool finished 聊天流反馈
+- 流结束后的 conversation 最终对齐
+
 ## 当前建议方向
 
-当前最自然的下一步，不再是“把桌面端跑起来”，因为基础设施已经具备。
+当前最自然的下一步，不再是“把桌面端跑起来”，也不再是“把 streaming 做出来”，因为这两部分主链路都已经具备。
 
-下一步更适合聚焦在桌面应用的体验增强与可观察性增强，例如：
+下一步更适合聚焦在桌面应用体验增强与可观察性增强，例如：
 
 - execution log visualization
-- streaming 交互体验
-- 更完整的设置与调试能力
+- 更完整的 streaming 体验
+- 更完整的桌面设置与调试能力
 
 ## 近期里程碑
 
 1. execution log visualization
-2. streaming 交互体验
+2. 更完整的 streaming 体验
 3. 更完整的桌面设置与调试能力
 4. long-term memory
 5. subgraph 或 multi-agent 实验
 
 ## 规划规则
 
-Roadmap 只表达产品方向与阶段顺序。
-
+Roadmap 只表达产品方向与阶段顺序。  
 具体实现工作应落到 `docs/exec-plans/active/` 中。

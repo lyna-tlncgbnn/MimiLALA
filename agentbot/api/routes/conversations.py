@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from agentbot.api.schemas import (
     ConversationDetail,
@@ -111,3 +114,31 @@ def send_message_to_conversation(conversation_id: str, request: SendMessageReque
         "messages": serialize_messages(messages),
         "reply": reply_payload,
     }
+
+
+@router.post("/{conversation_id}/messages/stream")
+def stream_message_to_conversation(conversation_id: str, request: SendMessageRequest):
+    chat_service = _chat_service()
+
+    def event_stream():
+        try:
+            for event in chat_service.stream_message_to_conversation(conversation_id, request.content):
+                payload = json.dumps(event.get("data", {}), ensure_ascii=False)
+                yield f"event: {event['event']}\n".encode("utf-8")
+                yield f"data: {payload}\n\n".encode("utf-8")
+        except FileNotFoundError as exc:
+            payload = json.dumps({"message": str(exc)}, ensure_ascii=False)
+            yield b"event: error\n"
+            yield f"data: {payload}\n\n".encode("utf-8")
+            yield b"event: done\n"
+            yield b"data: {}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

@@ -31,6 +31,80 @@ const sendMessageResponseSchema = z.object({
 export type ConversationSummary = z.infer<typeof conversationSummarySchema>;
 export type ChatMessage = z.infer<typeof messageSchema>;
 export type ConversationDetail = z.infer<typeof conversationDetailSchema>;
+export type ToolCallPayload = NonNullable<ChatMessage["tool_calls"]>[number];
+export type ChatStreamEvent =
+  | {
+      event: "user_message_accepted";
+      data: {
+        conversation_id: string;
+        message_id: string;
+        timestamp: string;
+        content: string;
+      };
+    }
+  | {
+      event: "assistant_waiting";
+      data: {
+        conversation_id: string;
+        timestamp: string;
+      };
+    }
+  | {
+      event: "assistant_message_started";
+      data: {
+        message_id: string;
+        timestamp: string;
+      };
+    }
+  | {
+      event: "assistant_delta";
+      data: {
+        message_id: string;
+        delta: string;
+      };
+    }
+  | {
+      event: "tool_started";
+      data: {
+        tool_call_id: string;
+        tool_name: string;
+        args: Record<string, unknown>;
+        timestamp: string;
+      };
+    }
+  | {
+      event: "tool_finished";
+      data: {
+        tool_call_id: string;
+        tool_name: string;
+        tool_output: string;
+        timestamp: string;
+      };
+    }
+  | {
+      event: "assistant_completed";
+      data: {
+        message_id: string;
+        timestamp: string;
+        content: string;
+      };
+    }
+  | {
+      event: "conversation_committed";
+      data: {
+        conversation_id: string;
+      };
+    }
+  | {
+      event: "error";
+      data: {
+        message: string;
+      };
+    }
+  | {
+      event: "done";
+      data: Record<string, never>;
+    };
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -114,4 +188,94 @@ export async function sendMessage(conversationId: string, content: string) {
     },
     sendMessageResponseSchema,
   );
+}
+
+export async function streamMessage(
+  conversationId: string,
+  content: string,
+  onEvent: (event: ChatStreamEvent) => void | Promise<void>,
+) {
+  const response = await fetch(`${API_BASE}/api/conversations/${conversationId}/messages/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const body = await response.json();
+      if (body?.detail) {
+        message = String(body.detail);
+      }
+    } catch {
+      // ignore non-json errors
+    }
+    throw new Error(message);
+  }
+
+  if (!response.body) {
+    throw new Error("Streaming response body was empty.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+
+    let boundaryIndex = buffer.indexOf("\n\n");
+    while (boundaryIndex !== -1) {
+      const rawEvent = buffer.slice(0, boundaryIndex);
+      buffer = buffer.slice(boundaryIndex + 2);
+
+      const parsedEvent = parseSseEvent(rawEvent);
+      if (parsedEvent) {
+        await onEvent(parsedEvent);
+      }
+
+      boundaryIndex = buffer.indexOf("\n\n");
+    }
+
+    if (done) {
+      break;
+    }
+  }
+
+  if (buffer.trim()) {
+    const parsedEvent = parseSseEvent(buffer);
+    if (parsedEvent) {
+      await onEvent(parsedEvent);
+    }
+  }
+}
+
+function parseSseEvent(rawEvent: string): ChatStreamEvent | null {
+  const normalized = rawEvent.replace(/\r/g, "");
+  const lines = normalized.split("\n");
+  let eventName = "";
+  const dataLines: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith("event:")) {
+      eventName = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      dataLines.push(line.slice(5).trim());
+    }
+  }
+
+  if (!eventName) {
+    return null;
+  }
+
+  const rawData = dataLines.join("\n");
+  const data = rawData ? JSON.parse(rawData) : {};
+  return {
+    event: eventName,
+    data,
+  } as ChatStreamEvent;
 }

@@ -7,11 +7,12 @@ from langchain_openai import ChatOpenAI
 from agentbot.config.settings import Settings
 
 
-def build_llm(settings: Settings) -> ChatOpenAI:
+def build_llm(settings: Settings, streaming: bool = False) -> ChatOpenAI:
     """Create the chat model from the current project settings."""
     return ChatOpenAI(
         api_key=settings.openai_api_key,
         base_url=settings.openai_base_url,
         model=settings.model,
         temperature=settings.temperature,
+        streaming=streaming,
     )

@@ -14,7 +14,7 @@ docs/      # 项目文档
 ## 运行入口
 
 - `main.py`
-  当前保留的 CLI 薄入口，只负责转到 `agentbot.app.cli`
+  当前保留的 CLI 总入口，只负责转到 `agentbot.app.cli`
 - `agentbot/app/cli.py`
   CLI 参数处理与交互循环
 - `agentbot/api/app.py`
@@ -26,10 +26,11 @@ docs/      # 项目文档
 
 ### `agentbot/app/`
 
-负责当前 CLI 与单轮运行调度：
+负责当前 CLI、同步执行与流式执行调度：
 
 - `cli.py`：CLI 入口与交互循环
-- `runner.py`：单轮运行总调度
+- `runner.py`：同步单轮执行总调度
+- `streaming_runner.py`：流式聊天执行调度
 - `debug.py`：控制台 debug 输出
 
 ### `agentbot/api/`
@@ -44,10 +45,10 @@ docs/      # 项目文档
 
 ### `agentbot/services/`
 
-负责把 API / CLI 需要的业务语义从底层 persistence 与 runner 中抽出来：
+负责把 API / CLI 需要的业务语义从底层 persistence 和 runner 中收出来：
 
 - `conversations.py`：conversation CRUD、消息历史读取、消息序列化
-- `chat.py`：在指定 conversation 上发送消息并返回最新状态
+- `chat.py`：在指定 conversation 上发送消息，并提供同步与流式聊天语义
 
 ### `agentbot/config/`
 
@@ -59,7 +60,7 @@ docs/      # 项目文档
 
 负责模型构造：
 
-- `llm.py`：构造 `ChatOpenAI`
+- `llm.py`：构造 `ChatOpenAI`，并支持按需开启 streaming
 
 ### `agentbot/prompts/`
 
@@ -86,7 +87,7 @@ docs/      # 项目文档
 
 ### `agentbot/tools/`
 
-负责工具定义与自动注册：
+负责 tools 定义与自动注册：
 
 - `basic.py`：基础演示工具
 - `filesystem.py`：文件相关工具
@@ -105,7 +106,7 @@ docs/      # 项目文档
 - `src/main.tsx`：前端启动入口
 - `src/App.tsx`：路由入口
 - `src/styles.css`：全局样式与设计 token
-- `src/lib/api.ts`：本地 API 访问层
+- `src/lib/api.ts`：本地 API 访问层，包含 `SSE` 消费逻辑
 - `src/lib/utils.ts`：通用前端工具函数
 - `src/stores/ui-store.ts`：本地 UI 状态
 
@@ -158,11 +159,11 @@ workspace/
 - Electron 负责桌面壳
 - React 负责界面
 - FastAPI 负责本地 API
-- Python 核心继续负责 Agent、persistence 和 tools
+- Python 核心继续负责 Agent、persistence、tools 和 streaming runner
 
 这套结构已经足够支撑后续继续扩展：
 
 - execution 可视化
-- streaming 交互
+- 更完整的 streaming 交互
 - 更完整的设置页
 - 更丰富的桌面能力

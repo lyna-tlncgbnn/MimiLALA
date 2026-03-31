@@ -15,6 +15,8 @@
   - 系统结构
   - graph flow
   - persistence model
+  - frontend architecture
+  - streaming chat
 - `product/`
   - scope
   - roadmap
@@ -22,6 +24,8 @@
   - 正在执行的实现计划
 - `exec-plans/completed/`
   - 已完成阶段归档
+- `exec-detail/`
+  - 每次执行完成后的实施记录与总结
 - `decisions/`
   - 重要技术决策
 - `runbooks/`
@@ -29,4 +33,4 @@
 
 ## 维护规则
 
-当代码行为发生变化时，优先更新这里对应的文档，而不是在别处补零散说明。
+当代码行为、结构或工作流发生变化时，优先更新这里对应的文档，而不是在别处补零散说明。

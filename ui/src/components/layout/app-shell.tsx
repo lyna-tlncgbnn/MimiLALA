@@ -5,12 +5,13 @@ import { zhCN } from "date-fns/locale";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
+  type ChatMessage,
   createConversation,
   deleteConversation,
   getConversation,
   listConversations,
   renameConversation,
-  sendMessage,
+  streamMessage,
 } from "@/lib/api";
 import { ChatPanel } from "@/components/layout/chat-panel";
 import { RenameDialog } from "@/components/layout/rename-dialog";
@@ -26,6 +27,49 @@ function formatRelativeTime(value: string) {
   }
 }
 
+type StreamPhase =
+  | "idle"
+  | "waiting_assistant"
+  | "assistant_streaming"
+  | "tool_running"
+  | "completed"
+  | "failed";
+
+function createClientMessage(role: ChatMessage["role"], content: string): ChatMessage {
+  return {
+    message_id: `msg_${crypto.randomUUID()}`,
+    timestamp: new Date().toISOString(),
+    role,
+    content,
+    name: null,
+    tool_call_id: null,
+    tool_calls: null,
+  };
+}
+
+function formatToolPendingContent(toolName: string, args: Record<string, unknown>) {
+  const entries = Object.entries(args ?? {});
+  const argsSummary = entries.map(([key, value]) => `${key}=${formatToolValue(value)}`).join(", ");
+  return argsSummary ? `Running ${toolName}\n${argsSummary}` : `Running ${toolName}`;
+}
+
+function formatToolValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (value === null || value === undefined) {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 export function AppShell() {
   const { conversationId } = useParams();
   const navigate = useNavigate();
@@ -38,6 +82,9 @@ export function AppShell() {
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const setRenameTargetId = useUiStore((state) => state.setRenameTargetId);
   const [draft, setDraft] = useState("");
+  const [liveMessages, setLiveMessages] = useState<ChatMessage[]>([]);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [streamPhase, setStreamPhase] = useState<StreamPhase>("idle");
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1220px)");
@@ -110,21 +157,13 @@ export function AppShell() {
     },
   });
 
-  const sendMessageMutation = useMutation({
-    mutationFn: ({ conversationId: targetId, content }: { conversationId: string; content: string }) =>
-      sendMessage(targetId, content),
-    onSuccess: (result) => {
-      queryClient.setQueryData(["conversation", result.conversation.conversation_id], {
-        conversation: result.conversation,
-        messages: result.messages,
-      });
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      setDraft("");
-    },
-  });
-
   const renameConversationItem = conversations.find(
     (conversation) => conversation.conversation_id === renameTargetId,
+  );
+
+  const displayedMessages = useMemo(
+    () => [...(conversationQuery.data?.messages ?? []), ...liveMessages],
+    [conversationQuery.data?.messages, liveMessages],
   );
 
   const sidebarConversations = conversations.map((conversation) => ({
@@ -132,6 +171,11 @@ export function AppShell() {
     title: conversation.name,
     time: formatRelativeTime(conversation.updated_at),
   }));
+
+  const isStreaming =
+    streamPhase === "waiting_assistant" ||
+    streamPhase === "assistant_streaming" ||
+    streamPhase === "tool_running";
 
   return (
     <main className="noise-overlay h-screen overflow-hidden text-[12px]">
@@ -151,41 +195,158 @@ export function AppShell() {
         />
 
         <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[rgba(255,255,255,0.42)]">
-          <header className="flex items-center justify-between border-b border-[rgba(53,40,17,0.08)] px-4 py-3">
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Desktop Foundation
-              </div>
-              <div className="mt-1 text-[18px] font-semibold text-foreground">
-                {conversationQuery.data?.conversation.name ?? "AgentBot"}
-              </div>
-            </div>
-            <div className="rounded-[12px] border border-border bg-[rgba(255,255,255,0.75)] px-3 py-2 text-[12px] text-muted-foreground">
-              FastAPI + Electron + React
-            </div>
-          </header>
-
           <ChatPanel
             draft={draft}
             error={
-              sendMessageMutation.error instanceof Error
-                ? sendMessageMutation.error.message
+              streamError
+                ? streamError
                 : conversationQuery.error instanceof Error
                   ? conversationQuery.error.message
                   : null
             }
-            isSending={sendMessageMutation.isPending}
+            isSending={isStreaming}
             loadingHistory={conversationQuery.isLoading}
-            messages={conversationQuery.data?.messages ?? []}
+            messages={displayedMessages}
             onDraftChange={setDraft}
             onSend={async () => {
-              if (!activeConversationId || !draft.trim() || sendMessageMutation.isPending) {
+              if (!activeConversationId || !draft.trim() || isStreaming) {
                 return;
               }
-              await sendMessageMutation.mutateAsync({
-                conversationId: activeConversationId,
-                content: draft.trim(),
-              });
+
+              const content = draft.trim();
+              const optimisticUser = createClientMessage("user", content);
+              const waitingAssistant = createClientMessage("assistant", "Waiting for reply...");
+
+              setDraft("");
+              setStreamError(null);
+              setStreamPhase("waiting_assistant");
+              setLiveMessages([optimisticUser, waitingAssistant]);
+
+              try {
+                await streamMessage(activeConversationId, content, async (event) => {
+                  if (event.event === "user_message_accepted") {
+                    setLiveMessages((current) =>
+                      current.map((message) =>
+                        message.message_id === optimisticUser.message_id
+                          ? {
+                              ...message,
+                              message_id: event.data.message_id,
+                              timestamp: event.data.timestamp,
+                              content: event.data.content,
+                            }
+                          : message,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "assistant_waiting") {
+                    setStreamPhase("waiting_assistant");
+                    setLiveMessages((current) =>
+                      current.map((message) =>
+                        message.message_id === waitingAssistant.message_id
+                          ? { ...message, timestamp: event.data.timestamp }
+                          : message,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "assistant_message_started") {
+                    setStreamPhase("assistant_streaming");
+                    setLiveMessages((current) =>
+                      current.map((message) =>
+                        message.message_id === waitingAssistant.message_id
+                          ? {
+                              ...message,
+                              message_id: event.data.message_id,
+                              timestamp: event.data.timestamp,
+                              content: "",
+                            }
+                          : message,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "assistant_delta") {
+                    setStreamPhase("assistant_streaming");
+                    setLiveMessages((current) =>
+                      current.map((message) =>
+                        message.role === "assistant" && message.message_id === event.data.message_id
+                          ? { ...message, content: `${message.content}${event.data.delta}` }
+                          : message,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "tool_started") {
+                    setStreamPhase("tool_running");
+                    setLiveMessages((current) => [
+                      ...current,
+                      {
+                        message_id: `tool_${event.data.tool_call_id}`,
+                        timestamp: event.data.timestamp,
+                        role: "tool",
+                        content: formatToolPendingContent(event.data.tool_name, event.data.args),
+                        name: event.data.tool_name,
+                        tool_call_id: event.data.tool_call_id,
+                        tool_calls: null,
+                      },
+                    ]);
+                    return;
+                  }
+
+                  if (event.event === "tool_finished") {
+                    setStreamPhase("assistant_streaming");
+                    setLiveMessages((current) =>
+                      current.map((message) =>
+                        message.role === "tool" && message.tool_call_id === event.data.tool_call_id
+                          ? {
+                              ...message,
+                              timestamp: event.data.timestamp,
+                              name: event.data.tool_name,
+                              content: event.data.tool_output,
+                            }
+                          : message,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "assistant_completed") {
+                    setStreamPhase("completed");
+                    setLiveMessages((current) =>
+                      current.map((message) =>
+                        message.role === "assistant" && message.message_id === event.data.message_id
+                          ? {
+                              ...message,
+                              timestamp: event.data.timestamp,
+                              content: event.data.content,
+                            }
+                          : message,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "error") {
+                    setStreamPhase("failed");
+                    setStreamError(event.data.message);
+                  }
+                });
+              } catch (error) {
+                setStreamPhase("failed");
+                setStreamError(error instanceof Error ? error.message : "Streaming request failed.");
+              } finally {
+                await Promise.all([
+                  queryClient.invalidateQueries({ queryKey: ["conversation", activeConversationId] }),
+                  queryClient.invalidateQueries({ queryKey: ["conversations"] }),
+                ]);
+                setLiveMessages([]);
+                setStreamPhase((current) => (current === "failed" ? "failed" : "idle"));
+              }
             }}
           />
         </section>

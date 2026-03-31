@@ -23,6 +23,25 @@ function getMessageTitle(message: ChatMessage) {
   return "You";
 }
 
+function formatMessageTime(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new Intl.DateTimeFormat("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
 export function ChatPanel({
   messages,
   draft,
@@ -109,7 +128,13 @@ export function ChatPanel({
                   key={key}
                   className={`flex min-w-0 w-full ${role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <MessageCard main={message.content} role={role} title={getMessageTitle(message)} />
+                  <MessageCard
+                    main={message.content}
+                    role={role}
+                    timestamp={formatMessageTime(message.timestamp)}
+                    title={getMessageTitle(message)}
+                    toolCalls={role === "assistant" ? message.tool_calls ?? [] : []}
+                  />
                 </div>
               );
             })
