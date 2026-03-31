@@ -34,9 +34,22 @@ export function AppShell() {
   const settingsOpen = useUiStore((state) => state.settingsOpen);
   const renameTargetId = useUiStore((state) => state.renameTargetId);
   const toggleSidebarCollapsed = useUiStore((state) => state.toggleSidebarCollapsed);
+  const setSidebarCollapsed = useUiStore((state) => state.setSidebarCollapsed);
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const setRenameTargetId = useUiStore((state) => state.setRenameTargetId);
   const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1220px)");
+
+    const syncSidebarState = () => {
+      setSidebarCollapsed(mediaQuery.matches);
+    };
+
+    syncSidebarState();
+    mediaQuery.addEventListener("change", syncSidebarState);
+    return () => mediaQuery.removeEventListener("change", syncSidebarState);
+  }, [setSidebarCollapsed]);
 
   const conversationsQuery = useQuery({
     queryKey: ["conversations"],

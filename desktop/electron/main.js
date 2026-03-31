@@ -32,8 +32,9 @@ async function createWindow() {
   const window = new BrowserWindow({
     width: 1480,
     height: 960,
-    minWidth: 1180,
-    minHeight: 760,
+    minWidth: 1120,
+    minHeight: 620,
+    autoHideMenuBar: true,
     backgroundColor: "#f7f7f5",
     title: "AgentBot Desktop",
     webPreferences: {
@@ -42,6 +43,8 @@ async function createWindow() {
       nodeIntegration: false,
     },
   });
+
+  window.setMenuBarVisibility(false);
 
   await window.loadURL(rendererUrl);
 }

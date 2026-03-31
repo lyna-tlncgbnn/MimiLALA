@@ -13,11 +13,11 @@ export function MessageContent({
   }
 
   if (mode === "plain") {
-    return <div className="whitespace-pre-wrap break-words">{content}</div>;
+    return <div className="min-w-0 whitespace-pre-wrap break-words">{content}</div>;
   }
 
   return (
-    <div className="markdown-content">
+    <div className="markdown-content min-w-0 break-words">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

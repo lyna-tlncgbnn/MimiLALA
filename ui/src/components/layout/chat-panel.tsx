@@ -58,7 +58,7 @@ export function ChatPanel({
       </div>
 
       <ScrollArea className="mt-2 min-h-0 flex-1 pr-1">
-        <div className="space-y-2 pb-2">
+        <div className="min-w-0 space-y-2 pb-2">
           {loadingHistory ? (
             <article className="rounded-[14px] border border-border bg-[rgba(255,255,255,0.78)] px-3 py-2.5 text-[12px] text-muted-foreground">
               正在加载会话历史...
@@ -105,7 +105,10 @@ export function ChatPanel({
                 message.role === "tool" ? "tool" : message.role === "assistant" ? "assistant" : "user";
               const key = `${message.message_id ?? "msg"}:${message.timestamp ?? index}:${index}`;
               return (
-                <div key={key} className={`flex ${role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  key={key}
+                  className={`flex min-w-0 w-full ${role === "user" ? "justify-end" : "justify-start"}`}
+                >
                   <MessageCard main={message.content} role={role} title={getMessageTitle(message)} />
                 </div>
               );
