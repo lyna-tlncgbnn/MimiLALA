@@ -15,15 +15,15 @@ const TOOL_VIEWPORT_HEIGHT = 240;
 const COLLAPSE_CONFIG = {
   user: {
     autoCollapse: true,
-    overlayClassName: "from-[rgba(249,246,241,0)] to-[rgba(249,246,241,0.98)]",
+    overlayClassName: "from-[rgba(255,255,255,0)] to-[rgba(255,255,255,0.98)]",
   },
   assistant: {
     autoCollapse: false,
-    overlayClassName: "from-[rgba(252,251,247,0)] to-[rgba(252,251,247,0.98)]",
+    overlayClassName: "from-[rgba(255,255,255,0)] to-[rgba(255,255,255,0.98)]",
   },
   tool: {
     autoCollapse: true,
-    overlayClassName: "from-[rgba(248,248,244,0)] to-[rgba(248,248,244,0.98)]",
+    overlayClassName: "from-[rgba(249,249,249,0)] to-[rgba(249,249,249,0.98)]",
   },
 } satisfies Record<
   "user" | "assistant" | "tool",
@@ -186,7 +186,7 @@ function MessageCardInner({
             aria-controls={contentId}
             aria-expanded={isExpanded}
             aria-label={isExpanded ? "Collapse message" : "Expand message"}
-            className="mt-2 inline-flex h-8 w-8 items-center justify-center rounded-none text-muted-foreground transition hover:bg-[rgba(180,106,44,0.08)] hover:text-foreground"
+            className="mt-2 inline-flex h-8 w-8 items-center justify-center rounded-none text-muted-foreground transition hover:bg-panel-strong hover:text-foreground"
             onClick={toggleExpanded}
             type="button"
           >
@@ -200,9 +200,9 @@ function MessageCardInner({
               aria-label={copyState === "copied" ? "Copied" : copyState === "error" ? "Copy failed" : "Copy text"}
               className={cn(
                 "inline-flex h-8 w-8 items-center justify-center rounded-none transition",
-                copyState === "copied" && "bg-[rgba(180,106,44,0.12)] text-accent",
+                copyState === "copied" && "bg-[rgba(32,33,35,0.08)] text-accent",
                 copyState === "error" && "bg-[rgba(154,50,36,0.08)] text-[rgba(154,50,36,0.9)]",
-                copyState === "idle" && "hover:bg-[rgba(53,40,17,0.06)] hover:text-foreground",
+                copyState === "idle" && "hover:bg-panel-strong hover:text-foreground",
               )}
               onClick={() => void handleCopy()}
               type="button"
@@ -215,7 +215,7 @@ function MessageCardInner({
                 aria-controls={contentId}
                 aria-expanded={isExpanded}
                 aria-label={isExpanded ? "Collapse message" : "Expand message"}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-none transition hover:bg-[rgba(53,40,17,0.06)] hover:text-foreground"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-none transition hover:bg-panel-strong hover:text-foreground"
                 onClick={toggleExpanded}
                 type="button"
               >

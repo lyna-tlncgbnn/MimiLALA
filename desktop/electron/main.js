@@ -36,7 +36,7 @@ async function createWindow() {
     minHeight: 620,
     autoHideMenuBar: true,
     backgroundColor: "#f7f7f5",
-    title: "AgentBot Desktop",
+    title: "MiniLALA",
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

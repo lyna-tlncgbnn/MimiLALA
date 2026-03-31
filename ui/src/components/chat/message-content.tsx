@@ -45,13 +45,13 @@ function MessageContentInner({
             const isBlock = Boolean(className);
             if (isBlock) {
               return (
-                <code className="block overflow-x-auto rounded-[10px] bg-[rgba(53,40,17,0.06)] px-3 py-2 font-mono text-[12px] leading-5">
+                <code className="block overflow-x-auto rounded-[10px] bg-[rgba(32,33,35,0.05)] px-3 py-2 font-mono text-[12px] leading-5">
                   {children}
                 </code>
               );
             }
             return (
-              <code className="rounded bg-[rgba(53,40,17,0.08)] px-1.5 py-0.5 font-mono text-[0.92em]">
+              <code className="rounded bg-[rgba(32,33,35,0.06)] px-1.5 py-0.5 font-mono text-[0.92em]">
                 {children}
               </code>
             );

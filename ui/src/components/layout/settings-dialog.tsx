@@ -24,7 +24,7 @@ export function SettingsDialog({
           </div>
         </div>
 
-        <div className="mt-5 space-y-3 rounded-[18px] border border-border bg-[rgba(255,255,255,0.72)] p-4">
+        <div className="mt-5 space-y-3 rounded-[18px] border border-border bg-[rgba(255,255,255,0.92)] p-4">
           <div>
             <div className="text-[12px] font-medium text-foreground">后端服务</div>
             <div className="mt-1 text-[12px] text-muted-foreground">本地 FastAPI 服务地址固定为 `127.0.0.1:8000`。</div>

@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f7f5;
-  --foreground: #232427;
-  --panel: #fcfcfa;
-  --panel-strong: #f2f2ef;
-  --panel-muted: #ecece8;
-  --border: rgba(36, 38, 42, 0.1);
-  --accent: #b46a2c;
-  --accent-foreground: #fff8f1;
-  --muted-foreground: #7a7e86;
-  --ring: rgba(180, 106, 44, 0.34);
+  --background: #f9f9f9;
+  --foreground: #202123;
+  --panel: #ffffff;
+  --panel-strong: #f3f4f6;
+  --panel-muted: #eceef1;
+  --border: rgba(32, 33, 35, 0.1);
+  --accent: #202123;
+  --accent-foreground: #ffffff;
+  --muted-foreground: #6e6f73;
+  --ring: rgba(32, 33, 35, 0.16);
 }
 
 @theme inline {
@@ -34,9 +34,9 @@
 
 html {
   background:
-    radial-gradient(circle at top center, rgba(226, 165, 101, 0.1), transparent 28%),
-    radial-gradient(circle at right 18%, rgba(234, 192, 147, 0.07), transparent 16%),
-    linear-gradient(180deg, #fbfbfa 0%, #f7f7f5 52%, #f2f2ef 100%);
+    radial-gradient(circle at top center, rgba(17, 24, 39, 0.03), transparent 28%),
+    radial-gradient(circle at right 18%, rgba(17, 24, 39, 0.025), transparent 16%),
+    linear-gradient(180deg, #ffffff 0%, #fbfbfc 52%, #f4f4f5 100%);
 }
 
 body {
@@ -59,7 +59,7 @@ textarea {
 }
 
 ::selection {
-  background: rgba(180, 106, 44, 0.14);
+  background: rgba(32, 33, 35, 0.12);
 }
 
 #root {

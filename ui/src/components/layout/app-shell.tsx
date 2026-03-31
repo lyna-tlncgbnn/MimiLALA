@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
-import { zhCN } from "date-fns/locale";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -18,14 +16,6 @@ import { RenameDialog } from "@/components/layout/rename-dialog";
 import { SettingsDialog } from "@/components/layout/settings-dialog";
 import { SidebarPanel } from "@/components/layout/sidebar-panel";
 import { useUiStore } from "@/stores/ui-store";
-
-function formatRelativeTime(value: string) {
-  try {
-    return formatDistanceToNow(new Date(value), { addSuffix: true, locale: zhCN });
-  } catch {
-    return value;
-  }
-}
 
 type StreamPhase =
   | "idle"
@@ -75,10 +65,12 @@ export function AppShell() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed);
+  const sidebarWidth = useUiStore((state) => state.sidebarWidth);
   const settingsOpen = useUiStore((state) => state.settingsOpen);
   const renameTargetId = useUiStore((state) => state.renameTargetId);
   const toggleSidebarCollapsed = useUiStore((state) => state.toggleSidebarCollapsed);
   const setSidebarCollapsed = useUiStore((state) => state.setSidebarCollapsed);
+  const setSidebarWidth = useUiStore((state) => state.setSidebarWidth);
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const setRenameTargetId = useUiStore((state) => state.setRenameTargetId);
   const [draft, setDraft] = useState("");
@@ -160,7 +152,6 @@ export function AppShell() {
   const sidebarConversations = conversations.map((conversation) => ({
     id: conversation.conversation_id,
     title: conversation.name,
-    time: formatRelativeTime(conversation.updated_at),
   }));
 
   const isStreaming =
@@ -178,7 +169,7 @@ export function AppShell() {
 
   return (
     <main className="noise-overlay h-screen overflow-hidden text-[12px]">
-      <div className="flex h-screen overflow-hidden border border-[rgba(53,40,17,0.08)] bg-[rgba(252,251,247,0.96)]">
+      <div className="flex h-screen overflow-hidden border border-[rgba(32,33,35,0.08)] bg-[rgba(255,255,255,0.96)]">
         <SidebarPanel
           activeConversationId={activeConversationId}
           collapsed={sidebarCollapsed}
@@ -190,10 +181,11 @@ export function AppShell() {
           onOpenSettings={() => setSettingsOpen(true)}
           onRenameConversation={(targetId) => setRenameTargetId(targetId)}
           onSelectConversation={(targetId) => navigate(`/conversations/${targetId}`)}
-          onToggleCollapse={toggleSidebarCollapsed}
+          onSidebarWidthChange={setSidebarWidth}
+          sidebarWidth={sidebarWidth}
         />
 
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[rgba(255,255,255,0.42)]">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[rgba(255,255,255,0.72)]">
           <ChatPanel
             draft={draft}
             error={
@@ -207,6 +199,7 @@ export function AppShell() {
             loadingHistory={conversationQuery.isLoading}
             messages={displayedMessages}
             onDraftChange={setDraft}
+            onToggleSidebar={toggleSidebarCollapsed}
             onSend={async () => {
               if (!draft.trim() || isStreaming) {
                 return;
@@ -407,6 +400,7 @@ export function AppShell() {
                 }
               }
             }}
+            sidebarCollapsed={sidebarCollapsed}
           />
         </section>
       </div>

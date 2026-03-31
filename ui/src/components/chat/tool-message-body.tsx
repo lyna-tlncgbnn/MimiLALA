@@ -19,7 +19,7 @@ export function ToolMessageBody({
   return (
     <div
       className={cn(
-        "min-w-0 overflow-y-auto border border-[rgba(53,40,17,0.10)] px-3 py-2",
+        "min-w-0 overflow-y-auto border border-[rgba(32,33,35,0.10)] bg-[rgba(255,255,255,0.82)] px-3 py-2",
         "scrollbar-thin scrollbar-track-transparent",
       )}
       id={contentId}

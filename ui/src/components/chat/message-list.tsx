@@ -80,14 +80,14 @@ export const MessageList = memo(function MessageList({
     <ScrollArea className="mt-2 min-h-0 flex-1 pr-1">
       <div className="min-w-0 space-y-2 pb-2">
         {loadingHistory ? (
-          <article className="rounded-[14px] border border-border bg-[rgba(255,255,255,0.78)] px-3 py-2.5 text-[12px] text-muted-foreground">
+          <article className="rounded-[14px] border border-border bg-[rgba(255,255,255,0.9)] px-3 py-2.5 text-[12px] text-muted-foreground">
             正在加载会话历史...
           </article>
         ) : messages.length === 0 ? (
           <section className="flex min-h-full items-center justify-center px-4 py-8">
             <div className="w-full max-w-[760px] px-6 py-7">
               <div className="flex items-center justify-center">
-                <div className="rounded-[18px] border border-[rgba(180,106,44,0.08)] bg-[rgba(180,106,44,0.025)] p-3 text-accent">
+                <div className="rounded-[18px] border border-[rgba(32,33,35,0.08)] bg-[rgba(32,33,35,0.03)] p-3 text-accent">
                   <Bot className="h-5 w-5" />
                 </div>
               </div>
@@ -101,7 +101,7 @@ export const MessageList = memo(function MessageList({
                 {emptyStatePrompts.map((prompt) => (
                   <button
                     key={prompt}
-                    className="rounded-[18px] border border-border bg-[rgba(255,255,255,0.78)] px-4 py-4 text-left transition hover:bg-white"
+                    className="rounded-[18px] border border-border bg-[rgba(255,255,255,0.92)] px-4 py-4 text-left transition hover:bg-white hover:shadow-[0_8px_22px_rgba(32,33,35,0.04)]"
                     onClick={() => onDraftSuggestion(prompt)}
                     type="button"
                   >
