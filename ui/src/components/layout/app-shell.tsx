@@ -216,6 +216,7 @@ export function AppShell() {
               const content = draft.trim();
               const optimisticUser = createClientMessage("user", content);
               const waitingAssistant = createClientMessage("assistant", "Waiting for reply...");
+              let activeAssistantMessageId = waitingAssistant.message_id;
 
               setDraft("");
               setStreamError(null);
@@ -244,7 +245,7 @@ export function AppShell() {
                     setStreamPhase("waiting_assistant");
                     setLiveMessages((current) =>
                       current.map((message) =>
-                        message.message_id === waitingAssistant.message_id
+                        message.message_id === activeAssistantMessageId
                           ? { ...message, timestamp: event.data.timestamp }
                           : message,
                       ),
@@ -254,18 +255,38 @@ export function AppShell() {
 
                   if (event.event === "assistant_message_started") {
                     setStreamPhase("assistant_streaming");
-                    setLiveMessages((current) =>
-                      current.map((message) =>
-                        message.message_id === waitingAssistant.message_id
-                          ? {
-                              ...message,
-                              message_id: event.data.message_id,
-                              timestamp: event.data.timestamp,
-                              content: "",
-                            }
-                          : message,
-                      ),
-                    );
+                    activeAssistantMessageId = event.data.message_id;
+                    setLiveMessages((current) => {
+                      const existingIndex = current.findIndex(
+                        (message) => message.role === "assistant" && message.message_id === waitingAssistant.message_id,
+                      );
+
+                      if (existingIndex >= 0) {
+                        return current.map((message, index) =>
+                          index === existingIndex
+                            ? {
+                                ...message,
+                                message_id: event.data.message_id,
+                                timestamp: event.data.timestamp,
+                                content: "",
+                              }
+                            : message,
+                        );
+                      }
+
+                      return [
+                        ...current,
+                        {
+                          message_id: event.data.message_id,
+                          timestamp: event.data.timestamp,
+                          role: "assistant",
+                          content: "",
+                          name: null,
+                          tool_call_id: null,
+                          tool_calls: null,
+                        },
+                      ];
+                    });
                     return;
                   }
 
@@ -273,7 +294,7 @@ export function AppShell() {
                     setStreamPhase("assistant_streaming");
                     setLiveMessages((current) =>
                       current.map((message) =>
-                        message.role === "assistant" && message.message_id === event.data.message_id
+                        message.role === "assistant" && message.message_id === activeAssistantMessageId
                           ? { ...message, content: `${message.content}${event.data.delta}` }
                           : message,
                       ),
@@ -283,18 +304,29 @@ export function AppShell() {
 
                   if (event.event === "tool_started") {
                     setStreamPhase("tool_running");
-                    setLiveMessages((current) => [
-                      ...current,
-                      {
-                        message_id: `tool_${event.data.tool_call_id}`,
-                        timestamp: event.data.timestamp,
-                        role: "tool",
-                        content: formatToolPendingContent(event.data.tool_name, event.data.args),
-                        name: event.data.tool_name,
-                        tool_call_id: event.data.tool_call_id,
-                        tool_calls: null,
-                      },
-                    ]);
+                    setLiveMessages((current) => {
+                      const nextMessages = current.filter(
+                        (message) =>
+                          !(
+                            message.role === "assistant" &&
+                            message.message_id === activeAssistantMessageId &&
+                            message.content.trim() === "Waiting for reply..."
+                          ),
+                      );
+
+                      return [
+                        ...nextMessages,
+                        {
+                          message_id: `tool_${event.data.tool_call_id}`,
+                          timestamp: event.data.timestamp,
+                          role: "tool",
+                          content: formatToolPendingContent(event.data.tool_name, event.data.args),
+                          name: event.data.tool_name,
+                          tool_call_id: event.data.tool_call_id,
+                          tool_calls: null,
+                        },
+                      ];
+                    });
                     return;
                   }
 
@@ -319,7 +351,7 @@ export function AppShell() {
                     setStreamPhase("completed");
                     setLiveMessages((current) =>
                       current.map((message) =>
-                        message.role === "assistant" && message.message_id === event.data.message_id
+                        message.role === "assistant" && message.message_id === activeAssistantMessageId
                           ? {
                               ...message,
                               timestamp: event.data.timestamp,

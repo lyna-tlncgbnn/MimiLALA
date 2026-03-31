@@ -145,6 +145,12 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
             if event_type == "updates":
                 for event in _events_from_updates(payload, emitted_tool_calls):
                     if event["event"] == "tool_started":
+                        # A new tool phase means any later assistant text should be rendered
+                        # as a new assistant segment after the tool output rather than appended
+                        # to the earlier pre-tool assistant message.
+                        assistant_started = False
+                        assistant_message_id = None
+                        assistant_timestamp = None
                         tool_args = event["data"].get("args")
                         tool_name = event["data"].get("tool_name")
                         events.append(
