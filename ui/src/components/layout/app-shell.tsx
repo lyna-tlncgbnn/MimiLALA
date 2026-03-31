@@ -105,18 +105,13 @@ export function AppShell() {
   });
 
   const conversations = conversationsQuery.data ?? [];
-  const activeConversationId = useMemo(() => {
-    if (conversationId) {
-      return conversationId;
-    }
-    return conversations[0]?.conversation_id ?? null;
-  }, [conversationId, conversations]);
+  const activeConversationId = useMemo(() => conversationId ?? null, [conversationId]);
 
   useEffect(() => {
-    if (!conversationId && conversations[0]?.conversation_id) {
-      navigate(`/conversations/${conversations[0].conversation_id}`, { replace: true });
-    }
-  }, [conversationId, conversations, navigate]);
+    setLiveMessages([]);
+    setStreamError(null);
+    setStreamPhase("idle");
+  }, [activeConversationId]);
 
   const conversationQuery = useQuery({
     queryKey: ["conversation", activeConversationId],
@@ -126,10 +121,6 @@ export function AppShell() {
 
   const createConversationMutation = useMutation({
     mutationFn: (name?: string) => createConversation(name),
-    onSuccess: async (conversation) => {
-      await queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      navigate(`/conversations/${conversation.conversation_id}`);
-    },
   });
 
   const renameConversationMutation = useMutation({
@@ -177,6 +168,14 @@ export function AppShell() {
     streamPhase === "assistant_streaming" ||
     streamPhase === "tool_running";
 
+  const handleStartNewConversation = () => {
+    setDraft("");
+    setLiveMessages([]);
+    setStreamError(null);
+    setStreamPhase("idle");
+    navigate("/");
+  };
+
   return (
     <main className="noise-overlay h-screen overflow-hidden text-[12px]">
       <div className="flex h-screen overflow-hidden border border-[rgba(53,40,17,0.08)] bg-[rgba(252,251,247,0.96)]">
@@ -186,7 +185,7 @@ export function AppShell() {
           conversations={sidebarConversations}
           deletingConversationId={deleteConversationMutation.isPending ? deleteConversationMutation.variables ?? null : null}
           loading={conversationsQuery.isLoading}
-          onCreateConversation={() => createConversationMutation.mutate(undefined)}
+          onCreateConversation={handleStartNewConversation}
           onDeleteConversation={(targetId) => deleteConversationMutation.mutate(targetId)}
           onOpenSettings={() => setSettingsOpen(true)}
           onRenameConversation={(targetId) => setRenameTargetId(targetId)}
@@ -209,11 +208,24 @@ export function AppShell() {
             messages={displayedMessages}
             onDraftChange={setDraft}
             onSend={async () => {
-              if (!activeConversationId || !draft.trim() || isStreaming) {
+              if (!draft.trim() || isStreaming) {
                 return;
               }
 
               const content = draft.trim();
+              let targetConversationId: string;
+              let createdConversationId: string | null = null;
+              let userMessageAccepted = false;
+
+              if (activeConversationId) {
+                targetConversationId = activeConversationId;
+              } else {
+                const createdConversation = await createConversationMutation.mutateAsync(undefined);
+                createdConversationId = createdConversation.conversation_id;
+                targetConversationId = createdConversationId;
+                await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+              }
+
               const optimisticUser = createClientMessage("user", content);
               const waitingAssistant = createClientMessage("assistant", "Waiting for reply...");
               let activeAssistantMessageId = waitingAssistant.message_id;
@@ -224,8 +236,9 @@ export function AppShell() {
               setLiveMessages([optimisticUser, waitingAssistant]);
 
               try {
-                await streamMessage(activeConversationId, content, async (event) => {
+                await streamMessage(targetConversationId, content, async (event) => {
                   if (event.event === "user_message_accepted") {
+                    userMessageAccepted = true;
                     setLiveMessages((current) =>
                       current.map((message) =>
                         message.message_id === optimisticUser.message_id
@@ -372,12 +385,26 @@ export function AppShell() {
                 setStreamPhase("failed");
                 setStreamError(error instanceof Error ? error.message : "Streaming request failed.");
               } finally {
+                if (createdConversationId && !userMessageAccepted) {
+                  try {
+                    await deleteConversation(createdConversationId);
+                    queryClient.removeQueries({ queryKey: ["conversation", createdConversationId] });
+                    await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+                  } catch {
+                    // Keep the original error state visible if cleanup fails.
+                  }
+                }
+
                 await Promise.all([
-                  queryClient.invalidateQueries({ queryKey: ["conversation", activeConversationId] }),
+                  queryClient.invalidateQueries({ queryKey: ["conversation", targetConversationId] }),
                   queryClient.invalidateQueries({ queryKey: ["conversations"] }),
                 ]);
                 setLiveMessages([]);
                 setStreamPhase((current) => (current === "failed" ? "failed" : "idle"));
+
+                if (createdConversationId && userMessageAccepted) {
+                  navigate(`/conversations/${createdConversationId}`);
+                }
               }
             }}
           />

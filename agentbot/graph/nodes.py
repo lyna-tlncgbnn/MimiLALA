@@ -21,8 +21,5 @@ def chatbot(state: MessagesState, llm: BaseChatModel):
 
 
 def execute_tools(state: MessagesState, tool_node: ToolNode):
-    """Run the tool node with a clearer error boundary."""
-    try:
-        return tool_node.invoke(state)
-    except Exception as exc:
-        raise RuntimeError(f"Tool execution failed: {exc}") from exc
+    """Run the tool node and let handled tool errors flow back to the model."""
+    return tool_node.invoke(state)

@@ -9,6 +9,7 @@ from langgraph.prebuilt import ToolNode
 from agentbot.graph.nodes import chatbot, execute_tools
 from agentbot.graph.routes import route_after_chatbot
 from agentbot.graph.state import MessagesState
+from agentbot.tools.error_handling import format_tool_error
 from agentbot.tools.registry import get_registered_tools
 
 
@@ -16,7 +17,7 @@ def build_graph(llm: BaseChatModel):
     """Build the minimal agent loop with model -> tools -> model."""
     tools = get_registered_tools()
     llm_with_tools = llm.bind_tools(tools)
-    tool_node = ToolNode(tools)
+    tool_node = ToolNode(tools, handle_tool_errors=format_tool_error)
 
     graph = StateGraph(MessagesState)
     graph.add_node("chatbot", lambda state: chatbot(state, llm_with_tools))

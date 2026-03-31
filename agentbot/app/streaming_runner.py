@@ -15,6 +15,7 @@ from agentbot.memory.conversation import AGENTBOT_META_KEY, ConversationStore
 from agentbot.memory.execution import ExecutionStore, build_event, new_execution_id
 from agentbot.models.llm import build_llm
 from agentbot.prompts.system import get_system_prompt
+from agentbot.tools.error_handling import is_tool_error_output
 from agentbot.tools.registry import get_registered_tools
 
 
@@ -162,9 +163,10 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
                             )
                         )
                     elif event["event"] == "tool_finished":
+                        tool_output = event["data"]["tool_output"]
                         completed_tool_messages.append(
                             ToolMessage(
-                                content=event["data"]["tool_output"],
+                                content=tool_output,
                                 tool_call_id=event["data"]["tool_call_id"],
                                 name=event["data"]["tool_name"],
                                 additional_kwargs={
@@ -175,14 +177,24 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
                                 },
                             )
                         )
-                        events.append(
-                            build_event(
-                                execution_id,
-                                "tool_completed",
-                                tool=event["data"]["tool_name"],
-                                output=event["data"]["tool_output"],
+                        if is_tool_error_output(tool_output):
+                            events.append(
+                                build_event(
+                                    execution_id,
+                                    "tool_failed",
+                                    tool=event["data"]["tool_name"],
+                                    error=tool_output,
+                                )
                             )
-                        )
+                        else:
+                            events.append(
+                                build_event(
+                                    execution_id,
+                                    "tool_completed",
+                                    tool=event["data"]["tool_name"],
+                                    output=tool_output,
+                                )
+                            )
                     yield event
                 continue
 

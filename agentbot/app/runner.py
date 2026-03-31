@@ -11,6 +11,7 @@ from agentbot.memory.conversation import ConversationStore
 from agentbot.memory.execution import ExecutionStore, build_event, new_execution_id
 from agentbot.models.llm import build_llm
 from agentbot.prompts.system import get_system_prompt
+from agentbot.tools.error_handling import is_tool_error_output
 from agentbot.tools.registry import get_registered_tools
 
 
@@ -183,14 +184,25 @@ def _events_from_new_messages(messages: list, execution_id: str) -> list[dict]:
                     )
                 )
         elif isinstance(message, ToolMessage):
-            events.append(
-                build_event(
-                    execution_id,
-                    "tool_completed",
-                    tool=message.name or "unknown_tool",
-                    output=_stringify_message_content(message.content),
+            content = _stringify_message_content(message.content)
+            if is_tool_error_output(content):
+                events.append(
+                    build_event(
+                        execution_id,
+                        "tool_failed",
+                        tool=message.name or "unknown_tool",
+                        error=content,
+                    )
                 )
-            )
+            else:
+                events.append(
+                    build_event(
+                        execution_id,
+                        "tool_completed",
+                        tool=message.name or "unknown_tool",
+                        output=content,
+                    )
+                )
     return events
 
 
