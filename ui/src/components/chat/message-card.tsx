@@ -1,11 +1,16 @@
-import { memo, useEffect, useId, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Copy, Hammer, Search, Sparkles } from "lucide-react";
 
-import { MessageContent } from "@/components/chat/message-content";
+import {
+  formatToolCallLine,
+} from "@/components/chat/message-body-utils";
+import { StandardMessageBody } from "@/components/chat/standard-message-body";
+import { ToolMessageBody } from "@/components/chat/tool-message-body";
 import type { ToolCallPayload } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const COLLAPSE_MAX_HEIGHT = 240;
+const STANDARD_COLLAPSE_MAX_HEIGHT = 240;
+const TOOL_VIEWPORT_HEIGHT = 240;
 
 const COLLAPSE_CONFIG = {
   user: {
@@ -45,11 +50,10 @@ function MessageCardInner({
   const isAssistant = role === "assistant";
   const isTool = role === "tool";
   const collapseConfig = COLLAPSE_CONFIG[role];
-  const defaultExpanded = !collapseConfig.autoCollapse;
+  const defaultExpanded = isTool ? false : !collapseConfig.autoCollapse;
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
-  const contentRef = useRef<HTMLDivElement | null>(null);
   const wasOverflowingRef = useRef(false);
   const hasUserToggledRef = useRef(false);
   const copyResetTimerRef = useRef<number | null>(null);
@@ -76,17 +80,24 @@ function MessageCardInner({
     }
   }, [defaultExpanded, main, role]);
 
-  useEffect(() => {
-    const node = contentRef.current;
+  const showCollapseToggle = isTool ? main.trim().length > 0 : isOverflowing;
+  const isCollapsed = isTool ? !isExpanded : showCollapseToggle && !isExpanded;
+  const showActionBar = !isUser;
+  const showInlineUserToggle = isUser && showCollapseToggle;
+  const hasToolCalls = isAssistant && toolCalls.length > 0;
+  const hasMainContent = main.trim().length > 0;
+  const hasVisibleContent = hasMainContent || hasToolCalls;
 
-    if (!node) {
-      return undefined;
-    }
+  const toolCallLines = toolCalls.map(formatToolCallLine);
+  const copyText = hasMainContent ? main : toolCallLines.join("\n");
 
-    const updateOverflowState = () => {
-      const nextOverflowing = node.scrollHeight > COLLAPSE_MAX_HEIGHT + 1;
+  const handleStandardOverflowChange = useCallback(
+    (nextOverflowing: boolean) => {
+      if (isTool) {
+        return;
+      }
+
       const wasOverflowing = wasOverflowingRef.current;
-
       setIsOverflowing(nextOverflowing);
 
       if (!nextOverflowing) {
@@ -97,31 +108,9 @@ function MessageCardInner({
       }
 
       wasOverflowingRef.current = nextOverflowing;
-    };
-
-    updateOverflowState();
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateOverflowState();
-    });
-
-    resizeObserver.observe(node);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [defaultExpanded, main]);
-
-  const showCollapseToggle = isOverflowing;
-  const isCollapsed = showCollapseToggle && !isExpanded;
-  const showActionBar = !isUser;
-  const showInlineUserToggle = isUser && showCollapseToggle;
-  const hasToolCalls = isAssistant && toolCalls.length > 0;
-  const hasMainContent = main.trim().length > 0;
-  const hasVisibleContent = hasMainContent || hasToolCalls;
-
-  const toolCallLines = toolCalls.map(formatToolCallLine);
-  const copyText = hasMainContent ? main : toolCallLines.join("\n");
+    },
+    [defaultExpanded, isTool],
+  );
 
   const toggleExpanded = () => {
     hasUserToggledRef.current = true;
@@ -172,63 +161,32 @@ function MessageCardInner({
       </div>
 
       <div className="mt-2 min-w-0 text-[14px] leading-7 text-foreground">
-        <div className="relative min-w-0">
-          <div
-            aria-expanded={showCollapseToggle ? isExpanded : undefined}
-            className={cn("min-w-0", isCollapsed && "overflow-hidden")}
-            id={contentId}
-            ref={contentRef}
-            style={isCollapsed ? { maxHeight: `${COLLAPSE_MAX_HEIGHT}px` } : undefined}
-          >
-            {hasToolCalls ? (
-              <div className="mb-3 space-y-2 last:mb-0">
-                {toolCalls.map((toolCall, index) => {
-                  const toolName = getToolCallName(toolCall);
-                  const argsSummary = formatToolCallArgs(toolCall);
-                  return (
-                    <div
-                      key={String(toolCall.id ?? `${toolName}:${index}`)}
-                      className="py-1"
-                    >
-                      <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Calling Tool
-                      </div>
-                      <div className="mt-1 text-[14px] font-medium leading-6 text-foreground">{toolName}</div>
-                      {argsSummary ? (
-                        <div className="mt-1 font-mono text-[12px] leading-5 text-muted-foreground">
-                          {argsSummary}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            {hasMainContent ? <MessageContent content={main} mode={isAssistant ? "markdown" : "plain"} /> : null}
-
-            {!hasVisibleContent ? (
-              <div className="text-[13px] leading-6 text-muted-foreground">No visible content.</div>
-            ) : null}
-          </div>
-
-          {isCollapsed ? (
-            <div
-              aria-hidden="true"
-              className={cn(
-                "pointer-events-none absolute inset-x-0 bottom-0 h-24 rounded-b-[14px] bg-gradient-to-b",
-                collapseConfig.overlayClassName,
-              )}
-            />
-          ) : null}
-        </div>
+        {isTool ? (
+          <ToolMessageBody
+            contentId={contentId}
+            isExpanded={isExpanded}
+            main={main}
+            viewportHeight={TOOL_VIEWPORT_HEIGHT}
+          />
+        ) : (
+          <StandardMessageBody
+            contentId={contentId}
+            isCollapsed={isCollapsed}
+            main={main}
+            maxHeight={STANDARD_COLLAPSE_MAX_HEIGHT}
+            onOverflowChange={handleStandardOverflowChange}
+            overlayClassName={collapseConfig.overlayClassName}
+            role={role}
+            toolCalls={toolCalls}
+          />
+        )}
 
         {showInlineUserToggle ? (
           <button
             aria-controls={contentId}
             aria-expanded={isExpanded}
             aria-label={isExpanded ? "Collapse message" : "Expand message"}
-            className="mt-2 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-[rgba(180,106,44,0.08)] hover:text-foreground"
+            className="mt-2 inline-flex h-8 w-8 items-center justify-center rounded-none text-muted-foreground transition hover:bg-[rgba(180,106,44,0.08)] hover:text-foreground"
             onClick={toggleExpanded}
             type="button"
           >
@@ -241,7 +199,7 @@ function MessageCardInner({
             <button
               aria-label={copyState === "copied" ? "Copied" : copyState === "error" ? "Copy failed" : "Copy text"}
               className={cn(
-                "inline-flex h-8 w-8 items-center justify-center rounded-full transition",
+                "inline-flex h-8 w-8 items-center justify-center rounded-none transition",
                 copyState === "copied" && "bg-[rgba(180,106,44,0.12)] text-accent",
                 copyState === "error" && "bg-[rgba(154,50,36,0.08)] text-[rgba(154,50,36,0.9)]",
                 copyState === "idle" && "hover:bg-[rgba(53,40,17,0.06)] hover:text-foreground",
@@ -257,7 +215,7 @@ function MessageCardInner({
                 aria-controls={contentId}
                 aria-expanded={isExpanded}
                 aria-label={isExpanded ? "Collapse message" : "Expand message"}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-[rgba(53,40,17,0.06)] hover:text-foreground"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-none transition hover:bg-[rgba(53,40,17,0.06)] hover:text-foreground"
                 onClick={toggleExpanded}
                 type="button"
               >
@@ -299,51 +257,3 @@ export const MessageCard = memo(MessageCardInner, (previousProps, nextProps) => 
     areToolCallsEqual(previousProps.toolCalls ?? [], nextProps.toolCalls ?? [])
   );
 });
-
-function getToolCallName(toolCall: ToolCallPayload) {
-  return typeof toolCall.name === "string" && toolCall.name.trim() ? toolCall.name : "unknown_tool";
-}
-
-function formatToolCallArgs(toolCall: ToolCallPayload) {
-  const args = toolCall.args;
-
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    return "";
-  }
-
-  const entries = Object.entries(args);
-
-  if (entries.length === 0) {
-    return "";
-  }
-
-  return entries
-    .map(([key, value]) => `${key}=${formatToolCallValue(value)}`)
-    .join(", ");
-}
-
-function formatToolCallLine(toolCall: ToolCallPayload) {
-  const name = getToolCallName(toolCall);
-  const argsSummary = formatToolCallArgs(toolCall);
-  return argsSummary ? `Calling tool: ${name} (${argsSummary})` : `Calling tool: ${name}`;
-}
-
-function formatToolCallValue(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-
-  if (value === null || value === undefined) {
-    return String(value);
-  }
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}

@@ -1,0 +1,31 @@
+import { MessageContent } from "@/components/chat/message-content";
+import { cn } from "@/lib/utils";
+
+export function ToolMessageBody({
+  main,
+  contentId,
+  isExpanded,
+  viewportHeight,
+}: {
+  main: string;
+  contentId: string;
+  isExpanded: boolean;
+  viewportHeight: number;
+}) {
+  if (!isExpanded) {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn(
+        "min-w-0 overflow-y-auto border border-[rgba(53,40,17,0.10)] px-3 py-2",
+        "scrollbar-thin scrollbar-track-transparent",
+      )}
+      id={contentId}
+      style={{ height: `${viewportHeight}px` }}
+    >
+      <MessageContent content={main} mode="plain" />
+    </div>
+  );
+}
