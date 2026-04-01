@@ -68,6 +68,8 @@ export const MessageList = memo(function MessageList({
           key: message.message_id ?? `message-${index}`,
           role,
           main: message.content,
+          delegation: role === "assistant" ? message.delegation ?? null : null,
+          browserTask: role === "assistant" ? message.browser_task ?? null : null,
           timestamp: formatMessageTime(message.timestamp),
           title: getMessageTitle(message),
           toolCalls: role === "assistant" ? message.tool_calls ?? [] : [],
@@ -124,6 +126,8 @@ export const MessageList = memo(function MessageList({
               className={`flex min-w-0 w-full ${message.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <MessageCard
+                delegation={message.delegation}
+                browserTask={message.browserTask}
                 main={message.main}
                 role={message.role}
                 timestamp={message.timestamp}

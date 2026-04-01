@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 
-from agentbot.memory.conversation import ConversationMeta, ConversationStore
+from agentbot.memory.conversation import (
+    ASSISTANT_BROWSER_TASK_KEY,
+    ASSISTANT_DELEGATION_KEY,
+    ASSISTANT_METADATA_KEY,
+    ASSISTANT_RESPONSE_KEY,
+    ASSISTANT_STATE_KEY,
+    ConversationMeta,
+    ConversationStore,
+)
 from agentbot.memory.execution import ExecutionStore
 
 
@@ -60,6 +68,22 @@ def message_to_api_dict(message: BaseMessage) -> dict:
         payload["role"] = "assistant"
         if message.tool_calls:
             payload["tool_calls"] = message.tool_calls
+        additional_kwargs = getattr(message, "additional_kwargs", {})
+        response = additional_kwargs.get(ASSISTANT_RESPONSE_KEY)
+        if response is not None:
+            payload["response"] = response
+        delegation = additional_kwargs.get(ASSISTANT_DELEGATION_KEY)
+        if delegation is not None:
+            payload["delegation"] = delegation
+        browser_task = additional_kwargs.get(ASSISTANT_BROWSER_TASK_KEY)
+        if browser_task is not None:
+            payload["browser_task"] = browser_task
+        state = additional_kwargs.get(ASSISTANT_STATE_KEY)
+        if state is not None:
+            payload["state"] = state
+        message_metadata = additional_kwargs.get(ASSISTANT_METADATA_KEY)
+        if message_metadata is not None:
+            payload["metadata"] = message_metadata
 
     if getattr(message, "name", None):
         payload["name"] = message.name

@@ -64,7 +64,14 @@ def run_once(user_text: str, conversation_id: str | None = None) -> str:
         debug.log_event(event)
 
     try:
-        graph = build_graph(llm)
+        graph = build_graph(
+            llm,
+            llm_config={
+                "api_key": settings.openai_api_key,
+                "base_url": settings.openai_base_url,
+                "model": settings.model,
+            },
+        )
     except Exception as exc:
         raise AgentBotError(f"Failed to build graph: {exc}") from exc
 

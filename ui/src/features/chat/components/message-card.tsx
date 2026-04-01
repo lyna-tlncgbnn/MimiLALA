@@ -6,7 +6,7 @@ import {
 } from "@/features/chat/components/message-body-utils";
 import { StandardMessageBody } from "@/features/chat/components/standard-message-body";
 import { ToolMessageBody } from "@/features/chat/components/tool-message-body";
-import type { ToolCallPayload } from "@/shared/api/api";
+import type { ChatMessage, ToolCallPayload } from "@/shared/api/api";
 import { cn } from "@/shared/lib/utils";
 
 const STANDARD_COLLAPSE_MAX_HEIGHT = 240;
@@ -37,12 +37,16 @@ function MessageCardInner({
   role,
   title,
   main,
+  delegation,
+  browserTask,
   toolCalls = [],
   timestamp,
 }: {
   role: "user" | "assistant" | "tool";
   title: string;
   main: string;
+  delegation?: ChatMessage["delegation"];
+  browserTask?: ChatMessage["browser_task"];
   toolCalls?: ToolCallPayload[];
   timestamp?: string | null;
 }) {
@@ -85,8 +89,10 @@ function MessageCardInner({
   const showActionBar = !isUser;
   const showInlineUserToggle = isUser && showCollapseToggle;
   const hasToolCalls = isAssistant && toolCalls.length > 0;
+  const hasDelegation = isAssistant && Boolean(delegation);
+  const hasBrowserTask = isAssistant && Boolean(browserTask);
   const hasMainContent = main.trim().length > 0;
-  const hasVisibleContent = hasMainContent || hasToolCalls;
+  const hasVisibleContent = hasMainContent || hasToolCalls || hasDelegation || hasBrowserTask;
 
   const toolCallLines = toolCalls.map(formatToolCallLine);
   const copyText = hasMainContent ? main : toolCallLines.join("\n");
@@ -161,6 +167,39 @@ function MessageCardInner({
       </div>
 
       <div className="mt-2 min-w-0 text-[14px] leading-7 text-foreground">
+        {hasDelegation ? (
+          <div className="mb-3 rounded-[18px] border border-[rgba(32,33,35,0.08)] bg-[rgba(32,33,35,0.03)] px-4 py-3 text-[12px] leading-6 text-[rgba(32,33,35,0.82)]">
+            <div className="font-medium text-foreground">
+              委托任务
+              {delegation?.target ? ` · ${delegation.target}` : ""}
+              {delegation?.status ? ` · ${delegation.status}` : ""}
+            </div>
+            {delegation?.reason ? <div className="mt-1">{delegation.reason}</div> : null}
+            {delegation?.task ? <div className="mt-1">{delegation.task}</div> : null}
+          </div>
+        ) : null}
+
+        {hasBrowserTask ? (
+          <div className="mb-3 rounded-[18px] border border-[rgba(32,33,35,0.08)] bg-[rgba(32,33,35,0.03)] px-4 py-3 text-[12px] leading-6 text-[rgba(32,33,35,0.82)]">
+            <div className="font-medium text-foreground">
+              浏览器任务
+              {browserTask?.status ? ` · ${browserTask.status}` : ""}
+            </div>
+            {browserTask?.task ? <div className="mt-1">{browserTask.task}</div> : null}
+            {browserTask?.page_title ? <div className="mt-1">页面标题: {browserTask.page_title}</div> : null}
+            {browserTask?.current_url ? <div className="mt-1 break-all">URL: {browserTask.current_url}</div> : null}
+            {browserTask?.steps?.length ? (
+              <div className="mt-2">
+                {browserTask.steps.map((step) => (
+                  <div key={step.step_number} className="mt-1">
+                    步骤 {step.step_number}: {String(step.action?.action_type ?? "unknown")}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {isTool ? (
           <ToolMessageBody
             contentId={contentId}
@@ -253,6 +292,7 @@ export const MessageCard = memo(MessageCardInner, (previousProps, nextProps) => 
     previousProps.role === nextProps.role &&
     previousProps.title === nextProps.title &&
     previousProps.main === nextProps.main &&
+    JSON.stringify(previousProps.browserTask ?? null) === JSON.stringify(nextProps.browserTask ?? null) &&
     previousProps.timestamp === nextProps.timestamp &&
     areToolCallsEqual(previousProps.toolCalls ?? [], nextProps.toolCalls ?? [])
   );

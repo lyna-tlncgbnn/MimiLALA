@@ -20,6 +20,11 @@ class MessagePayload(BaseModel):
     name: str | None = None
     tool_call_id: str | None = None
     tool_calls: list[dict] | None = None
+    response: dict | None = None
+    delegation: dict | None = None
+    browser_task: dict | None = None
+    state: dict | None = None
+    metadata: dict | None = None
 
 
 class ConversationDetail(BaseModel):
@@ -43,3 +48,25 @@ class SendMessageResponse(BaseModel):
     conversation: ConversationSummary
     messages: list[MessagePayload]
     reply: MessagePayload
+
+
+class BrowserStepPayload(BaseModel):
+    step_number: int
+    action: dict
+    result: dict | None = None
+
+
+class BrowserTaskRequest(BaseModel):
+    task: str = Field(min_length=1)
+    start_url: str | None = None
+    max_steps: int = Field(default=5, ge=1, le=12)
+
+
+class BrowserTaskResponse(BaseModel):
+    status: str
+    final_response: str | None = None
+    error_message: str | None = None
+    current_url: str | None = None
+    page_title: str | None = None
+    step_count: int
+    steps: list[BrowserStepPayload]

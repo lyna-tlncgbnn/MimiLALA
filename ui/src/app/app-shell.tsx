@@ -34,6 +34,28 @@ function createClientMessage(role: ChatMessage["role"], content: string): ChatMe
     name: null,
     tool_call_id: null,
     tool_calls: null,
+    response: role === "assistant" ? { text: content } : null,
+    delegation: null,
+    browser_task: null,
+    state: role === "assistant" ? { kind: "final" } : null,
+    metadata: null,
+  };
+}
+
+function createEmptyAssistantMessage(messageId: string, timestamp: string): ChatMessage {
+  return {
+    message_id: messageId,
+    timestamp,
+    role: "assistant",
+    content: "",
+    name: null,
+    tool_call_id: null,
+    tool_calls: null,
+    response: null,
+    delegation: null,
+    browser_task: null,
+    state: { kind: "planning" },
+    metadata: null,
   };
 }
 
@@ -58,6 +80,57 @@ function formatToolValue(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function updateAssistantMessage(
+  messages: ChatMessage[],
+  assistantMessageId: string | null | undefined,
+  updater: (message: ChatMessage) => ChatMessage,
+) {
+  if (!assistantMessageId) {
+    return messages;
+  }
+  return messages.map((message) =>
+    message.role === "assistant" && message.message_id === assistantMessageId ? updater(message) : message,
+  );
+}
+
+function buildBrowserStatusText(browserTask: ChatMessage["browser_task"]): string {
+  if (!browserTask) {
+    return "";
+  }
+
+  const lines = [
+    browserTask.task ? `正在使用浏览器执行任务: ${browserTask.task}` : "正在使用浏览器执行任务...",
+    browserTask.page_title ? `当前页面: ${browserTask.page_title}` : null,
+    browserTask.current_url ? `URL: ${browserTask.current_url}` : null,
+  ];
+
+  const lastStep = browserTask.steps?.[browserTask.steps.length - 1];
+  if (lastStep) {
+    const actionType = String(lastStep.action?.action_type ?? "unknown");
+    lines.push(`最近步骤 ${lastStep.step_number}: ${actionType}`);
+    const extractedContent =
+      typeof lastStep.result?.extracted_content === "string" ? lastStep.result.extracted_content : null;
+    const errorMessage = typeof lastStep.result?.error === "string" ? lastStep.result.error : null;
+    if (errorMessage) {
+      lines.push(`结果: ${errorMessage}`);
+    } else if (extractedContent) {
+      lines.push(`结果: ${extractedContent}`);
+    }
+  }
+
+  if (browserTask.status === "completed" && browserTask.final_response) {
+    lines.push("");
+    lines.push(browserTask.final_response);
+  }
+
+  if (browserTask.status === "failed" && browserTask.error_message) {
+    lines.push("");
+    lines.push(`失败原因: ${browserTask.error_message}`);
+  }
+
+  return lines.filter(Boolean).join("\n");
 }
 
 export function AppShell() {
@@ -275,24 +348,45 @@ export function AppShell() {
                                 message_id: event.data.message_id,
                                 timestamp: event.data.timestamp,
                                 content: "",
+                                response: null,
+                                delegation: null,
+                                browser_task: null,
+                                state: { kind: "planning" },
                               }
                             : message,
                         );
                       }
 
-                      return [
-                        ...current,
-                        {
-                          message_id: event.data.message_id,
-                          timestamp: event.data.timestamp,
-                          role: "assistant",
-                          content: "",
-                          name: null,
-                          tool_call_id: null,
-                          tool_calls: null,
-                        },
-                      ];
+                      return [...current, createEmptyAssistantMessage(event.data.message_id, event.data.timestamp)];
                     });
+                    return;
+                  }
+
+                  if (event.event === "supervisor_decision_made") {
+                    setLiveMessages((current) =>
+                      updateAssistantMessage(current, activeAssistantMessageId ?? waitingAssistant.message_id, (message) => ({
+                        ...message,
+                        delegation: {
+                          target: event.data.decision === "browser" ? "browser" : event.data.decision,
+                          status:
+                            event.data.decision === "browser"
+                              ? "planned"
+                              : event.data.decision === "tools"
+                                ? "planned"
+                                : "completed",
+                          reason: event.data.reason,
+                          task: event.data.browser_task ?? undefined,
+                        },
+                        state: {
+                          kind:
+                            event.data.decision === "browser"
+                              ? "delegating"
+                              : event.data.decision === "tools"
+                                ? "tooling"
+                                : "final",
+                        },
+                      })),
+                    );
                     return;
                   }
 
@@ -301,7 +395,12 @@ export function AppShell() {
                     setLiveMessages((current) =>
                       current.map((message) =>
                         message.role === "assistant" && message.message_id === activeAssistantMessageId
-                          ? { ...message, content: `${message.content}${event.data.delta}` }
+                          ? {
+                              ...message,
+                              content: `${message.content}${event.data.delta}`,
+                              response: { text: `${message.content}${event.data.delta}` },
+                              state: { kind: "final" },
+                            }
                           : message,
                       ),
                     );
@@ -356,15 +455,176 @@ export function AppShell() {
                   if (event.event === "assistant_completed") {
                     setStreamPhase("completed");
                     setLiveMessages((current) =>
-                      current.map((message) =>
-                        message.role === "assistant" && message.message_id === activeAssistantMessageId
-                          ? {
-                              ...message,
-                              timestamp: event.data.timestamp,
-                              content: event.data.content,
-                            }
-                          : message,
-                      ),
+                      updateAssistantMessage(current, activeAssistantMessageId ?? waitingAssistant.message_id, (message) => ({
+                        ...message,
+                        timestamp: event.data.timestamp,
+                        content: event.data.content,
+                        response: { text: event.data.content },
+                        state: { kind: "final" },
+                      })),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "browser_subgraph_started") {
+                    setStreamPhase("assistant_streaming");
+                    setLiveMessages((current) =>
+                      updateAssistantMessage(current, activeAssistantMessageId ?? waitingAssistant.message_id, (message) => {
+                        const browserTask = {
+                          task: event.data.task,
+                          status: "running",
+                          final_response: null,
+                          error_message: null,
+                          current_url: null,
+                          page_title: null,
+                          step_count: 0,
+                          steps: [],
+                        };
+                        return {
+                          ...message,
+                          delegation: {
+                            target: "browser",
+                            status: "running",
+                            reason: message.delegation?.reason,
+                            task: event.data.task,
+                          },
+                          browser_task: browserTask,
+                          state: { kind: "delegating" },
+                        };
+                      }),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "browser_observed") {
+                    setLiveMessages((current) =>
+                      updateAssistantMessage(current, activeAssistantMessageId ?? waitingAssistant.message_id, (message) => {
+                        const browserTask = {
+                          task: message.browser_task?.task,
+                          status: message.browser_task?.status ?? "running",
+                          final_response: message.browser_task?.final_response ?? null,
+                          error_message: message.browser_task?.error_message ?? null,
+                          current_url: event.data.current_url ?? message.browser_task?.current_url ?? null,
+                          page_title: event.data.page_title ?? message.browser_task?.page_title ?? null,
+                          step_count: message.browser_task?.step_count ?? 0,
+                          steps: message.browser_task?.steps ?? [],
+                        };
+                        return {
+                          ...message,
+                          browser_task: browserTask,
+                          state: { kind: "delegating" },
+                        };
+                      }),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "browser_action_planned") {
+                    setLiveMessages((current) =>
+                      updateAssistantMessage(current, activeAssistantMessageId ?? waitingAssistant.message_id, (message) => {
+                        const existingSteps = message.browser_task?.steps ?? [];
+                        const stepNumber =
+                          typeof event.data.step_number === "number"
+                            ? event.data.step_number
+                            : existingSteps.length + 1;
+                        const nextSteps = [
+                          ...existingSteps.filter((step) => step.step_number !== stepNumber),
+                          {
+                            step_number: stepNumber,
+                            action: event.data.action ?? {},
+                            result: null,
+                          },
+                        ].sort((a, b) => a.step_number - b.step_number);
+                        const browserTask = {
+                          task: message.browser_task?.task,
+                          status: "running",
+                          final_response: message.browser_task?.final_response ?? null,
+                          error_message: message.browser_task?.error_message ?? null,
+                          current_url: message.browser_task?.current_url ?? null,
+                          page_title: message.browser_task?.page_title ?? null,
+                          step_count: nextSteps.length,
+                          steps: nextSteps,
+                        };
+                        return {
+                          ...message,
+                          browser_task: browserTask,
+                          state: { kind: "delegating" },
+                        };
+                      }),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "browser_action_started") {
+                    setStreamPhase("assistant_streaming");
+                    return;
+                  }
+
+                  if (event.event === "browser_action_finished") {
+                    setLiveMessages((current) =>
+                      updateAssistantMessage(current, activeAssistantMessageId ?? waitingAssistant.message_id, (message) => {
+                        const existingSteps = message.browser_task?.steps ?? [];
+                        const stepNumber =
+                          typeof event.data.step_number === "number"
+                            ? event.data.step_number
+                            : existingSteps.length;
+                        const nextSteps = existingSteps.map((step) =>
+                          step.step_number === stepNumber
+                            ? {
+                                ...step,
+                                result: event.data.result ?? null,
+                              }
+                            : step,
+                        );
+                        const browserTask = {
+                          task: message.browser_task?.task,
+                          status: event.data.status ?? message.browser_task?.status ?? "running",
+                          final_response: message.browser_task?.final_response ?? null,
+                          error_message:
+                            typeof event.data.result?.error === "string"
+                              ? event.data.result.error
+                              : message.browser_task?.error_message ?? null,
+                          current_url: message.browser_task?.current_url ?? null,
+                          page_title: message.browser_task?.page_title ?? null,
+                          step_count: nextSteps.length,
+                          steps: nextSteps,
+                        };
+                        return {
+                          ...message,
+                          browser_task: browserTask,
+                          state: { kind: "delegating" },
+                        };
+                      }),
+                    );
+                    return;
+                  }
+
+                  if (event.event === "browser_subgraph_completed" || event.event === "browser_subgraph_failed") {
+                    setStreamPhase("assistant_streaming");
+                    setLiveMessages((current) =>
+                      updateAssistantMessage(current, activeAssistantMessageId ?? waitingAssistant.message_id, (message) => {
+                        const browserTask = {
+                          task: message.browser_task?.task,
+                          status: event.data.status,
+                          final_response: event.data.final_response ?? null,
+                          error_message: event.data.error_message ?? null,
+                          current_url: event.data.current_url ?? message.browser_task?.current_url ?? null,
+                          page_title: event.data.page_title ?? message.browser_task?.page_title ?? null,
+                          step_count: event.data.step_count ?? message.browser_task?.step_count ?? 0,
+                          steps: message.browser_task?.steps ?? [],
+                        };
+                        return {
+                          ...message,
+                          delegation: {
+                            target: "browser",
+                            status: event.data.status,
+                            reason: message.delegation?.reason,
+                            task: browserTask.task,
+                          },
+                          browser_task: browserTask,
+                          state: { kind: "delegating" },
+                        };
+                      }),
                     );
                     return;
                   }

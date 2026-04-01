@@ -19,6 +19,11 @@ LEGACY_SESSIONS_DIR_NAME = "sessions"
 META_TYPE = "meta"
 MESSAGE_TYPE = "message"
 AGENTBOT_META_KEY = "_agentbot"
+ASSISTANT_RESPONSE_KEY = "response"
+ASSISTANT_DELEGATION_KEY = "delegation"
+ASSISTANT_BROWSER_TASK_KEY = "browser_task"
+ASSISTANT_STATE_KEY = "state"
+ASSISTANT_METADATA_KEY = "metadata"
 
 
 @dataclass(slots=True)
@@ -310,11 +315,22 @@ def _legacy_record_to_message(payload: dict[str, Any]) -> BaseMessage:
     if role == "user":
         return HumanMessage(content=content, name=name, additional_kwargs={AGENTBOT_META_KEY: metadata})
     if role == "assistant":
+        additional_kwargs = {AGENTBOT_META_KEY: metadata}
+        if payload.get("response") is not None:
+            additional_kwargs[ASSISTANT_RESPONSE_KEY] = payload.get("response")
+        if payload.get("delegation") is not None:
+            additional_kwargs[ASSISTANT_DELEGATION_KEY] = payload.get("delegation")
+        if payload.get("browser_task") is not None:
+            additional_kwargs[ASSISTANT_BROWSER_TASK_KEY] = payload.get("browser_task")
+        if payload.get("state") is not None:
+            additional_kwargs[ASSISTANT_STATE_KEY] = payload.get("state")
+        if payload.get("metadata") is not None:
+            additional_kwargs[ASSISTANT_METADATA_KEY] = payload.get("metadata")
         return AIMessage(
             content=content,
             name=name,
             tool_calls=list(payload.get("tool_calls") or []),
-            additional_kwargs={AGENTBOT_META_KEY: metadata},
+            additional_kwargs=additional_kwargs,
         )
     if role == "tool":
         tool_call_id = str(payload.get("tool_call_id") or "")
@@ -343,6 +359,16 @@ def _record_to_message(payload: dict[str, Any]) -> BaseMessage:
     if role == "user":
         return HumanMessage(content=content, name=name, additional_kwargs=additional_kwargs)
     if role == "assistant":
+        if payload.get("response") is not None:
+            additional_kwargs[ASSISTANT_RESPONSE_KEY] = payload.get("response")
+        if payload.get("delegation") is not None:
+            additional_kwargs[ASSISTANT_DELEGATION_KEY] = payload.get("delegation")
+        if payload.get("browser_task") is not None:
+            additional_kwargs[ASSISTANT_BROWSER_TASK_KEY] = payload.get("browser_task")
+        if payload.get("state") is not None:
+            additional_kwargs[ASSISTANT_STATE_KEY] = payload.get("state")
+        if payload.get("metadata") is not None:
+            additional_kwargs[ASSISTANT_METADATA_KEY] = payload.get("metadata")
         return AIMessage(
             content=content,
             name=name,
@@ -372,6 +398,7 @@ def _message_to_record(message: BaseMessage) -> dict[str, Any]:
             "content": message.content,
         }
     elif isinstance(message, AIMessage):
+        response_payload = _assistant_response_payload(message)
         record = {
             "type": MESSAGE_TYPE,
             "message_id": metadata["message_id"],
@@ -379,8 +406,18 @@ def _message_to_record(message: BaseMessage) -> dict[str, Any]:
             "role": "assistant",
             "content": message.content,
         }
+        if response_payload is not None:
+            record["response"] = response_payload
         if message.tool_calls:
             record["tool_calls"] = message.tool_calls
+        if ASSISTANT_DELEGATION_KEY in message.additional_kwargs:
+            record["delegation"] = message.additional_kwargs[ASSISTANT_DELEGATION_KEY]
+        if ASSISTANT_BROWSER_TASK_KEY in message.additional_kwargs:
+            record["browser_task"] = message.additional_kwargs[ASSISTANT_BROWSER_TASK_KEY]
+        if ASSISTANT_STATE_KEY in message.additional_kwargs:
+            record["state"] = message.additional_kwargs[ASSISTANT_STATE_KEY]
+        if ASSISTANT_METADATA_KEY in message.additional_kwargs:
+            record["metadata"] = message.additional_kwargs[ASSISTANT_METADATA_KEY]
     elif isinstance(message, ToolMessage):
         record = {
             "type": MESSAGE_TYPE,
@@ -406,6 +443,24 @@ def _get_or_assign_message_metadata(message: BaseMessage) -> dict[str, str]:
         metadata["timestamp"] = _now_iso()
     message.additional_kwargs[AGENTBOT_META_KEY] = metadata
     return metadata
+
+
+def _assistant_response_payload(message: AIMessage) -> dict[str, Any] | None:
+    response = message.additional_kwargs.get(ASSISTANT_RESPONSE_KEY)
+    if isinstance(response, dict):
+        return response
+
+    if isinstance(message.content, str) and message.content:
+        return {"text": message.content}
+    if isinstance(message.content, list):
+        text = "".join(
+            item if isinstance(item, str) else str(item.get("text", ""))
+            for item in message.content
+            if isinstance(item, str) or (isinstance(item, dict) and item.get("type") == "text")
+        ).strip()
+        if text:
+            return {"text": text}
+    return None
 
 
 def _new_message_metadata() -> dict[str, str]:

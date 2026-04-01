@@ -63,7 +63,14 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
         debug.log_event(event)
 
     try:
-        graph = build_graph(llm)
+        graph = build_graph(
+            llm,
+            llm_config={
+                "api_key": settings.openai_api_key,
+                "base_url": settings.openai_base_url,
+                "model": settings.model,
+            },
+        )
     except Exception as exc:
         yield _ui_event("error", message=f"Failed to build graph: {exc}")
         yield _ui_event("done")
@@ -109,11 +116,12 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
     assistant_fragments: list[str] = []
     completed_tool_messages: list[ToolMessage] = []
     emitted_tool_calls: set[str] = set()
+    browser_assistant_bootstrapped = False
 
     try:
         for chunk in graph.stream(
             {"messages": input_messages},
-            stream_mode=["messages", "updates", "values"],
+            stream_mode=["messages", "updates", "values", "custom"],
             version="v2",
         ):
             event_type, payload = _normalize_stream_chunk(chunk)
@@ -121,7 +129,7 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
                 continue
 
             if event_type == "messages":
-                delta = _extract_delta(payload)
+                delta = _extract_visible_delta(payload)
                 if delta is None:
                     continue
 
@@ -195,6 +203,26 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
                                     output=tool_output,
                                 )
                             )
+                    yield event
+                continue
+
+            if event_type == "custom":
+                for event in _events_from_custom(
+                    payload,
+                    assistant_started=assistant_started,
+                    assistant_message_id=assistant_message_id,
+                    assistant_timestamp=assistant_timestamp,
+                    browser_assistant_bootstrapped=browser_assistant_bootstrapped,
+                ):
+                    if event["event"] == "assistant_message_started":
+                        assistant_started = True
+                        browser_assistant_bootstrapped = True
+                        assistant_message_id = str(event["data"]["message_id"])
+                        assistant_timestamp = str(event["data"]["timestamp"])
+                    elif event["event"] == "assistant_completed":
+                        assistant_started = False
+                        assistant_message_id = str(event["data"]["message_id"])
+                        assistant_timestamp = str(event["data"]["timestamp"])
                     yield event
                 continue
 
@@ -396,6 +424,39 @@ def _persist_partial_failure(
         pass
 
 
+def _events_from_custom(
+    payload: Any,
+    *,
+    assistant_started: bool,
+    assistant_message_id: str | None,
+    assistant_timestamp: str | None,
+    browser_assistant_bootstrapped: bool,
+) -> Iterator[dict[str, Any]]:
+    if not isinstance(payload, dict):
+        return
+
+    source = payload.get("source")
+    event_name = payload.get("event")
+    if not isinstance(event_name, str):
+        return
+
+    data = {key: value for key, value in payload.items() if key not in {"source", "event"}}
+    if source == "supervisor" and event_name == "supervisor_decision_made":
+        yield _ui_event(event_name, **data)
+        return
+
+    if source != "browser_subgraph":
+        return
+
+    if event_name == "browser_subgraph_started" and not assistant_started and not browser_assistant_bootstrapped:
+        yield _ui_event(
+            "assistant_message_started",
+            message_id=assistant_message_id or _new_prefixed_id("msg"),
+            timestamp=assistant_timestamp or _now_iso(),
+        )
+    yield _ui_event(event_name, **data)
+
+
 def _find_last_assistant_message(messages: list[BaseMessage]) -> AIMessage | None:
     for message in reversed(messages):
         if isinstance(message, AIMessage) and _extract_assistant_content(message.content):
@@ -406,11 +467,21 @@ def _find_last_assistant_message(messages: list[BaseMessage]) -> AIMessage | Non
     return None
 
 
-def _extract_delta(payload: Any) -> str | None:
+VISIBLE_MESSAGE_NODES = {"respond"}
+
+
+def _extract_visible_delta(payload: Any) -> str | None:
     if not isinstance(payload, tuple) or len(payload) != 2:
         return None
 
-    token, _metadata = payload
+    token, metadata = payload
+    if not isinstance(metadata, dict):
+        return None
+
+    node_name = str(metadata.get("langgraph_node") or "")
+    if node_name not in VISIBLE_MESSAGE_NODES:
+        return None
+
     text = _extract_assistant_content(getattr(token, "content", token))
     return text if text else None
 

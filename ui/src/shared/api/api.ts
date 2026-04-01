@@ -15,6 +15,44 @@ const messageSchema = z.object({
   name: z.string().nullable().optional(),
   tool_call_id: z.string().nullable().optional(),
   tool_calls: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
+  response: z
+    .object({
+      text: z.string().optional(),
+    })
+    .nullable()
+    .optional(),
+  delegation: z
+    .object({
+      target: z.string().optional(),
+      status: z.string().optional(),
+      reason: z.string().optional(),
+      task: z.string().optional(),
+    })
+    .nullable()
+    .optional(),
+  browser_task: z
+    .object({
+      task: z.string().optional(),
+      status: z.string(),
+      final_response: z.string().nullable().optional(),
+      error_message: z.string().nullable().optional(),
+      current_url: z.string().nullable().optional(),
+      page_title: z.string().nullable().optional(),
+      step_count: z.number().optional(),
+      steps: z
+        .array(
+          z.object({
+            step_number: z.number(),
+            action: z.record(z.string(), z.unknown()),
+            result: z.record(z.string(), z.unknown()).nullable().optional(),
+          }),
+        )
+        .optional(),
+    })
+    .nullable()
+    .optional(),
+  state: z.record(z.string(), z.unknown()).nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 const conversationDetailSchema = z.object({
@@ -47,6 +85,14 @@ export type ChatStreamEvent =
       data: {
         conversation_id: string;
         timestamp: string;
+      };
+    }
+  | {
+      event: "supervisor_decision_made";
+      data: {
+        decision: string;
+        reason: string;
+        browser_task?: string | null;
       };
     }
   | {
@@ -87,6 +133,53 @@ export type ChatStreamEvent =
         message_id: string;
         timestamp: string;
         content: string;
+      };
+    }
+  | {
+      event: "browser_subgraph_started";
+      data: {
+        task: string;
+      };
+    }
+  | {
+      event: "browser_observed";
+      data: {
+        current_url?: string;
+        page_title?: string;
+      };
+    }
+  | {
+      event: "browser_action_planned";
+      data: {
+        step_number?: number | null;
+        action?: Record<string, unknown>;
+      };
+    }
+  | {
+      event: "browser_action_started";
+      data: {
+        step_number?: number | null;
+        action?: Record<string, unknown>;
+      };
+    }
+  | {
+      event: "browser_action_finished";
+      data: {
+        step_number?: number | null;
+        action?: Record<string, unknown>;
+        result?: Record<string, unknown>;
+        status?: string;
+      };
+    }
+  | {
+      event: "browser_subgraph_completed" | "browser_subgraph_failed";
+      data: {
+        status: string;
+        final_response?: string | null;
+        error_message?: string | null;
+        current_url?: string | null;
+        page_title?: string | null;
+        step_count?: number;
       };
     }
   | {
