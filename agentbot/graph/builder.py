@@ -10,7 +10,7 @@ from langgraph.prebuilt import ToolNode
 from agentbot.graph.nodes import chatbot, execute_tools
 from agentbot.graph.routes import route_after_chatbot
 from agentbot.graph.state import MessagesState
-from agentbot.tools.error_handling import format_tool_error
+from agentbot.tools.infra.error_handling import format_tool_error
 from agentbot.tools.registry import get_registered_tools
 
 

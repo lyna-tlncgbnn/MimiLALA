@@ -16,7 +16,7 @@ from agentbot.prompts.system import get_system_prompt
 from agentbot.services.sqlite_conversations import SQLiteConversationService
 from agentbot.storage.common import AGENTBOT_META_KEY
 from agentbot.storage.shadow_runtime import ActiveRunShadow, RuntimeShadowWriter
-from agentbot.tools.error_handling import is_tool_error_output
+from agentbot.tools.infra.error_handling import is_tool_error_output
 from agentbot.tools.registry import get_registered_tools
 
 

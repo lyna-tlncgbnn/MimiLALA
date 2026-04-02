@@ -24,4 +24,3 @@ def format_tool_error(exc: Exception) -> str:
 def is_tool_error_output(content: str) -> bool:
     """Check whether a tool output string represents a handled tool failure."""
     return content.startswith(TOOL_ERROR_PREFIX)
-

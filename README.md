@@ -91,10 +91,18 @@ Electron
 - `get_current_time`
 - `multiply`
 - `list_directory`
+- `glob_files`
+- `search_in_files`
 - `read_file`
+- `read_file_range`
 - `write_file`
+- `replace_in_file`
+- `append_file`
+- `run_command`
 - `read_pdf`
 - `read_docx`
+- `web_search`
+- `fetch_url`
 
 ## 项目结构
 
@@ -135,6 +143,32 @@ config.json      本地运行配置
     "model": "gpt-4.1-mini",
     "temperature": 0.1
   },
+  "search": {
+    "provider": "tavily",
+    "api_key": "your_search_api_key",
+    "max_results": 5,
+    "timeout_seconds": 12
+  },
+  "command": {
+    "enabled": true,
+    "default_timeout_seconds": 20,
+    "max_timeout_seconds": 60,
+    "max_output_chars": 12000,
+    "allowed_programs": [
+      ".venv\\Scripts\\python.exe",
+      "python",
+      "uv",
+      "npm"
+    ],
+    "blocked_patterns": [
+      "del ",
+      "remove-item",
+      "rmdir",
+      ">",
+      "|",
+      "&&"
+    ]
+  },
   "debug": false
 }
 ```
@@ -145,6 +179,8 @@ config.json      本地运行配置
 - `llm.base_url` 可选，默认走 OpenAI 官方地址
 - `llm.model` 默认 `gpt-4.1-mini`
 - `llm.temperature` 必须是数字
+- `search.*` 用于应用级联网搜索配置
+- `command.*` 用于受限本地命令执行配置
 - `debug` 控制控制台调试输出
 
 实现见：

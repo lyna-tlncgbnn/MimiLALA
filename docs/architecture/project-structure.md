@@ -81,8 +81,16 @@ SQLite 主存储：
 工具模块与注册：
 
 - `basic.py`
+- `codebase.py`
+- `common.py`
+- `command.py`
+- `editing.py`
 - `filesystem.py`
+- `web_fetch.py`
+- `web_search.py`
 - `registry.py`
+- `infra/`
+- `providers/`
 
 ### `agentbot/memory/`
 
