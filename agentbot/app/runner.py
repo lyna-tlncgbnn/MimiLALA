@@ -1,16 +1,21 @@
-"""Runner for single-turn CLI execution with local conversation and execution logs."""
+"""Runner for single-turn execution backed by SQLite transcript and run storage."""
 
 from __future__ import annotations
+
+from datetime import datetime
+from uuid import uuid4
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from agentbot.app.debug import DebugPrinter
 from agentbot.config.settings import Settings
 from agentbot.graph.builder import build_graph
-from agentbot.memory.conversation import ConversationStore
-from agentbot.memory.execution import ExecutionStore, build_event, new_execution_id
+from agentbot.graph.checkpoints import sqlite_checkpointer, thread_config, thread_has_checkpoints
 from agentbot.models.llm import build_llm
 from agentbot.prompts.system import get_system_prompt
+from agentbot.services.sqlite_conversations import SQLiteConversationService
+from agentbot.storage.common import AGENTBOT_META_KEY
+from agentbot.storage.shadow_runtime import ActiveRunShadow, RuntimeShadowWriter
 from agentbot.tools.error_handling import is_tool_error_output
 from agentbot.tools.registry import get_registered_tools
 
@@ -33,123 +38,119 @@ def run_once(user_text: str, conversation_id: str | None = None) -> str:
     except Exception as exc:
         raise AgentBotError(f"Failed to initialize chat model: {exc}") from exc
 
-    conversation_store = ConversationStore()
-    execution_store = ExecutionStore()
+    conversation_service = SQLiteConversationService()
+    runtime_writer = RuntimeShadowWriter()
     tools = get_registered_tools()
-    events: list[dict] = []
 
     try:
-        meta, history = _load_target_conversation(conversation_store, conversation_id)
+        meta = _load_target_conversation(conversation_service, conversation_id)
     except Exception as exc:
         raise AgentBotError(f"Failed to load conversation history: {exc}") from exc
 
-    execution_id = new_execution_id()
-    events.append(
-        build_event(
-            execution_id,
-            "conversation_loaded",
-            message_count=len(history),
-        )
+    thread_id = meta.conversation_id
+    user_message_id = _new_prefixed_id("msg")
+    user_timestamp = _now_iso()
+    user_message = HumanMessage(
+        content=user_text,
+        additional_kwargs={
+            AGENTBOT_META_KEY: {
+                "message_id": user_message_id,
+                "timestamp": user_timestamp,
+            }
+        },
     )
-    events.append(
-        build_event(
-            execution_id,
-            "tools_registered",
-            tools=[tool.name for tool in tools],
-        )
-    )
-    events.append(build_event(execution_id, "graph_started"))
+    active_run = _safe_start_run(runtime_writer, meta=meta, user_message=user_message)
 
-    for event in events:
-        debug.log_event(event)
+    debug.log(f"tools registered: {', '.join(tool.name for tool in tools)}")
+    debug.log("graph execution started")
 
     try:
-        graph = build_graph(llm)
+        with sqlite_checkpointer() as checkpointer:
+            seeded_from_transcript = not thread_has_checkpoints(checkpointer, thread_id)
+            input_messages = _build_input_messages(
+                conversation_service=conversation_service,
+                conversation_id=meta.conversation_id,
+                user_message=user_message,
+                seed_from_transcript=seeded_from_transcript,
+            )
+            graph = build_graph(llm, checkpointer=checkpointer)
+            debug.log(
+                "loaded conversation state: "
+                f"{'transcript seed' if seeded_from_transcript else 'checkpoint resume'}"
+            )
+            result = graph.invoke(
+                {"messages": input_messages},
+                config=thread_config(thread_id),
+            )
     except Exception as exc:
-        raise AgentBotError(f"Failed to build graph: {exc}") from exc
-
-    input_messages = [
-        SystemMessage(content=get_system_prompt()),
-        *history,
-        HumanMessage(content=user_text),
-    ]
-
-    try:
-        result = graph.invoke({"messages": input_messages})
-    except Exception as exc:
-        failure_event = build_event(
-            execution_id,
-            "run_failed",
-            stage="graph_execution",
-            error=str(exc),
-        )
-        events.append(failure_event)
-        debug.log_event(failure_event)
-        try:
-            execution_store.append_events(meta, events)
-        except Exception:
-            pass
+        if active_run is not None:
+            _best_effort(
+                lambda: runtime_writer.fail_run(
+                    active_run,
+                    meta=meta,
+                    error_message=_format_graph_error(exc),
+                    ended_at=_now_iso(),
+                )
+            )
         raise AgentBotError(_format_graph_error(exc)) from exc
 
-    new_messages = result["messages"][len(input_messages) :]
-    message_events = _events_from_new_messages(new_messages, execution_id)
-    events.extend(message_events)
-    for event in message_events:
-        debug.log_event(event)
-
-    try:
-        meta = conversation_store.replace_conversation_messages(
-            meta.conversation_id,
-            result["messages"],
-            existing_meta=meta,
+    final_messages = result["messages"]
+    new_messages = _messages_for_current_run(final_messages, user_message_id)
+    if active_run is not None:
+        _best_effort(
+            lambda: _persist_run_outcome(
+                runtime_writer=runtime_writer,
+                active_run=active_run,
+                meta=meta,
+                new_messages=new_messages,
+                final_messages=final_messages,
+            )
         )
-    except Exception as exc:
-        failure_event = build_event(
-            execution_id,
-            "run_failed",
-            stage="conversation_persistence",
-            error=str(exc),
-        )
-        events.append(failure_event)
-        debug.log_event(failure_event)
-        try:
-            execution_store.append_events(meta, events)
-        except Exception:
-            pass
-        raise AgentBotError(f"Failed to persist conversation history: {exc}") from exc
 
-    try:
-        execution_store.append_events(meta, events)
-    except Exception as exc:
-        raise AgentBotError(f"Failed to persist execution log: {exc}") from exc
-
-    return _extract_final_text(result["messages"])
+    return _extract_final_text(final_messages)
 
 
 def _load_target_conversation(
-    conversation_store: ConversationStore,
+    conversation_service: SQLiteConversationService,
     conversation_id: str | None,
 ):
     if conversation_id:
-        return conversation_store.get_conversation(conversation_id)
-    return conversation_store.load_default_conversation()
+        meta, _messages = conversation_service.get_conversation(conversation_id)
+        return meta
+    meta, _messages = conversation_service.get_default_conversation()
+    return meta
+
+
+def _build_input_messages(
+    *,
+    conversation_service: SQLiteConversationService,
+    conversation_id: str,
+    user_message: HumanMessage,
+    seed_from_transcript: bool,
+) -> list:
+    if not seed_from_transcript:
+        return [user_message]
+    history = conversation_service.get_conversation_history_messages(conversation_id)
+    return [
+        SystemMessage(content=get_system_prompt()),
+        *history,
+        user_message,
+    ]
+
+
+def _messages_for_current_run(messages: list, user_message_id: str) -> list:
+    for index, message in enumerate(messages):
+        metadata = _message_metadata(message)
+        if metadata["message_id"] == user_message_id:
+            return messages[index + 1 :]
+    return messages
 
 
 def _extract_final_text(messages: list) -> str:
-    for message in reversed(messages):
-        if isinstance(message, AIMessage):
-            content = message.content
-            if isinstance(content, str):
-                return content
-            if isinstance(content, list):
-                text_chunks: list[str] = []
-                for item in content:
-                    if isinstance(item, str):
-                        text_chunks.append(item)
-                    elif isinstance(item, dict) and item.get("type") == "text":
-                        text_chunks.append(str(item.get("text", "")))
-                return "\n".join(chunk for chunk in text_chunks if chunk).strip()
-    raise AgentBotError("No assistant response was returned by the graph.")
+    final_assistant = _find_final_assistant_message(messages)
+    if final_assistant is None:
+        raise AgentBotError("No assistant response was returned by the graph.")
+    return _stringify_message_content(final_assistant.content)
 
 
 def _format_graph_error(exc: Exception) -> str:
@@ -161,49 +162,68 @@ def _format_graph_error(exc: Exception) -> str:
     return f"Graph execution failed: {message}"
 
 
-def _events_from_new_messages(messages: list, execution_id: str) -> list[dict]:
-    events: list[dict] = []
-    for message in messages:
-        if isinstance(message, AIMessage):
-            if message.tool_calls:
-                for tool_call in message.tool_calls:
-                    events.append(
-                        build_event(
-                            execution_id,
-                            "tool_call_emitted",
-                            tool=tool_call.get("name"),
-                            args=tool_call.get("args"),
-                        )
-                    )
-            else:
-                events.append(
-                    build_event(
-                        execution_id,
-                        "final_answer",
-                        content=_stringify_message_content(message.content),
-                    )
+def _persist_run_outcome(
+    *,
+    runtime_writer: RuntimeShadowWriter,
+    active_run: ActiveRunShadow,
+    meta,
+    new_messages: list,
+    final_messages: list,
+) -> None:
+    for message in new_messages:
+        if isinstance(message, AIMessage) and message.tool_calls:
+            metadata = _message_metadata(message)
+            for tool_call in message.tool_calls:
+                tool_call_id = str(tool_call.get("id") or "")
+                if not tool_call_id:
+                    continue
+                runtime_writer.record_tool_started(
+                    active_run,
+                    tool_call_id=tool_call_id,
+                    tool_name=str(tool_call.get("name") or "unknown_tool"),
+                    args=tool_call.get("args") or {},
+                    timestamp=metadata["timestamp"],
                 )
         elif isinstance(message, ToolMessage):
+            metadata = _message_metadata(message)
             content = _stringify_message_content(message.content)
-            if is_tool_error_output(content):
-                events.append(
-                    build_event(
-                        execution_id,
-                        "tool_failed",
-                        tool=message.name or "unknown_tool",
-                        error=content,
-                    )
-                )
-            else:
-                events.append(
-                    build_event(
-                        execution_id,
-                        "tool_completed",
-                        tool=message.name or "unknown_tool",
-                        output=content,
-                    )
-                )
-    return events
+            runtime_writer.record_tool_finished(
+                active_run,
+                tool_call_id=str(message.tool_call_id or ""),
+                tool_name=message.name or "unknown_tool",
+                tool_output=content,
+                timestamp=metadata["timestamp"],
+                failed=is_tool_error_output(content),
+            )
+
+    final_assistant = _find_final_assistant_message(final_messages)
+    if final_assistant is None:
+        runtime_writer.fail_run(
+            active_run,
+            meta=meta,
+            error_message="No final assistant message was produced.",
+            ended_at=_now_iso(),
+        )
+        return
+
+    assistant_metadata = _message_metadata(final_assistant)
+    runtime_writer.complete_run(
+        active_run,
+        meta=meta,
+        assistant_message_id=assistant_metadata["message_id"],
+        assistant_text=_stringify_message_content(final_assistant.content),
+        assistant_timestamp=assistant_metadata["timestamp"],
+    )
+
+
+def _find_final_assistant_message(messages: list) -> AIMessage | None:
+    for message in reversed(messages):
+        if isinstance(message, AIMessage) and _stringify_message_content(message.content):
+            return message
+    for message in reversed(messages):
+        if isinstance(message, AIMessage):
+            return message
+    return None
 
 
 def _stringify_message_content(content) -> str:
@@ -218,3 +238,44 @@ def _stringify_message_content(content) -> str:
                 text_chunks.append(str(item.get("text", "")))
         return "\n".join(chunk for chunk in text_chunks if chunk).strip()
     return str(content)
+
+
+def _safe_start_run(
+    runtime_writer: RuntimeShadowWriter,
+    *,
+    meta,
+    user_message: HumanMessage,
+) -> ActiveRunShadow | None:
+    try:
+        metadata = _message_metadata(user_message)
+        return runtime_writer.start_run(
+            meta=meta,
+            user_message_id=metadata["message_id"],
+            user_text=_stringify_message_content(user_message.content),
+            user_timestamp=metadata["timestamp"],
+        )
+    except Exception:
+        return None
+
+
+def _message_metadata(message) -> dict[str, str]:
+    metadata = dict(getattr(message, "additional_kwargs", {}).get(AGENTBOT_META_KEY) or {})
+    return {
+        "message_id": str(metadata.get("message_id") or _new_prefixed_id("msg")),
+        "timestamp": str(metadata.get("timestamp") or _now_iso()),
+    }
+
+
+def _new_prefixed_id(prefix: str) -> str:
+    return f"{prefix}_{uuid4().hex}"
+
+
+def _now_iso() -> str:
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def _best_effort(action) -> None:
+    try:
+        action()
+    except Exception:
+        pass

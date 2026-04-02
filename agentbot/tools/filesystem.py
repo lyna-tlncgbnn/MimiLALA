@@ -58,16 +58,28 @@ def list_directory(path: str) -> str:
 
     entries = sorted(directory.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower()))
     if not entries:
-        return f"Directory is empty: {_format_path(directory)}"
+        return f"Directory: {_format_path(directory)}\nStatus: empty"
 
-    lines: list[str] = []
-    for entry in entries[:MAX_LIST_ENTRIES]:
-        kind = "dir" if entry.is_dir() else "file"
-        lines.append(f"{kind}: {_format_path(entry)}")
+    visible_entries = entries[:MAX_LIST_ENTRIES]
+    directories = [entry for entry in visible_entries if entry.is_dir()]
+    files = [entry for entry in visible_entries if entry.is_file()]
+
+    lines: list[str] = [f"Directory: {_format_path(directory)}"]
+    lines.append(f"Subdirectories ({len(directories)}):")
+    if directories:
+        lines.extend(f"- {_format_path(entry)}" for entry in directories)
+    else:
+        lines.append("- none")
+
+    lines.append(f"Files ({len(files)}):")
+    if files:
+        lines.extend(f"- {_format_path(entry)}" for entry in files)
+    else:
+        lines.append("- none")
 
     if len(entries) > MAX_LIST_ENTRIES:
         lines.append(
-            f"... truncated: showing first {MAX_LIST_ENTRIES} of {len(entries)} entries"
+            f"Truncated: showing first {MAX_LIST_ENTRIES} of {len(entries)} entries"
         )
 
     return "\n".join(lines)

@@ -1,70 +1,58 @@
-# 产品 Roadmap
+# Product Roadmap
 
-## 当前状态
+## 当前阶段
 
-当前代码已经完成了几个关键阶段：
+AgentBot 当前已经从“学习型 CLI 项目”演进成一个可运行的本地桌面 Agent 应用。
 
-- project skeleton
-- minimal agent loop
-- default conversation persistence
-- framework hardening
-- conversation meta 和 local execution logs
-- richer tools
-- multi-conversation persistence
-- desktop app foundation
-- streaming chat phase 1
+已经落地的关键阶段包括：
 
-其中最近完成的几个阶段是：
-
-### multi-conversation persistence
-
-已经完成：
-
-- conversation 按 `conversation_id` 独立存储
-- execution 按 `conversation_id` 独立存储
-- 默认会话通过指针文件绑定到标准 conversation 对象
-- 多会话 CRUD 语义已经在 persistence 内核中具备
-
-### desktop app foundation
-
-已经完成：
-
-- FastAPI 本地服务入口
-- conversation CRUD API
-- send message API
-- React 前端工程骨架
+- Python Agent 核心
+- FastAPI 本地 API
+- React 前端
 - Electron 桌面壳
-- 本地桌面端到后端的基础联通链路
+- SQLite 主存储
+- run / step 数据模型
+- LangGraph checkpoint 集成
+- run-oriented streaming chat
+- 可展开执行区 UI
 
-### streaming chat phase 1
+## 当前近期方向
 
-已经完成：
+当前最自然的下一阶段不是继续做“基础设施迁移”，而是围绕当前主链路做体验增强和稳定性增强。
 
-- 基于 `SSE` 的流式聊天接口
-- optimistic user message
-- assistant waiting / assistant streaming 状态
-- tool started / tool finished 聊天流反馈
-- 流结束后的 conversation 最终对齐
+近期重点建议：
 
-## 当前建议方向
+1. 执行区进一步打磨
+2. 更完善的 streaming stop / retry / recovery
+3. artifacts 体系落地
+4. 更系统的调试与 tracing 体验
+5. 测试与验收自动化
 
-当前最自然的下一步，不再是“把桌面端跑起来”，也不再是“把 streaming 做出来”，因为这两部分主链路都已经具备。
+## 中期方向
 
-下一步更适合聚焦在桌面应用体验增强与可观察性增强，例如：
+中期可继续推进：
 
-- execution log visualization
-- 更完整的 streaming 体验
-- 更完整的桌面设置与调试能力
+1. 更丰富的工具生态
+2. 更完善的任务型 UI
+3. artifacts 浏览与管理
+4. 更强的 checkpoint 调试能力
+5. 更规范的 runbook / diagnostics 体系
 
-## 近期里程碑
+## 长期探索
 
-1. execution log visualization
-2. 更完整的 streaming 体验
-3. 更完整的桌面设置与调试能力
-4. long-term memory
-5. subgraph 或 multi-agent 实验
+当前长期探索方向包括：
 
-## 规划规则
+1. long-term memory
+2. subgraph
+3. multi-agent orchestration
+4. 更完整的桌面工作台能力
 
-Roadmap 只表达产品方向与阶段顺序。  
-具体实现工作应落到 `docs/exec-plans/active/` 中。
+## Roadmap 规则
+
+Roadmap 只表达产品演进方向。
+
+具体实施仍然应落到：
+
+- `docs/exec-plans/active/`
+- `docs/exec-plans/completed/`
+- `docs/exec-detail/`

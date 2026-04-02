@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 
 from agentbot.app.runner import AgentBotError, run_once
+from agentbot.storage.bootstrap import ensure_agent_database
 
 EXIT_COMMANDS = {"exit", "quit", "/exit", "/quit"}
 ASSISTANT_LABEL = "AgentBot"
@@ -37,6 +38,7 @@ def _run_interactive_loop() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_agent_database()
     args = argv or sys.argv
     if len(args) > 1:
         try:

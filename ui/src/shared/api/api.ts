@@ -9,6 +9,7 @@ const conversationSummarySchema = z.object({
 
 const messageSchema = z.object({
   message_id: z.string().nullable().optional(),
+  run_id: z.string().nullable().optional(),
   timestamp: z.string().nullable().optional(),
   role: z.string(),
   content: z.string(),
@@ -22,8 +23,59 @@ const conversationDetailSchema = z.object({
   messages: z.array(messageSchema),
 });
 
+const runSummarySchema = z.object({
+  run_id: z.string(),
+  conversation_id: z.string(),
+  thread_id: z.string(),
+  status: z.string(),
+  started_at: z.string(),
+  ended_at: z.string().nullable().optional(),
+  workflow_name: z.string().nullable().optional(),
+  user_message_id: z.string().nullable().optional(),
+  final_message_id: z.string().nullable().optional(),
+  error_message: z.string().nullable().optional(),
+  step_count: z.number().default(0),
+  visible_step_count: z.number().default(0),
+  has_execution: z.boolean().default(false),
+});
+
+const conversationRunsDetailSchema = z.object({
+  conversation: conversationSummarySchema,
+  runs: z.array(runSummarySchema),
+});
+
+const runStepSchema = z.object({
+  step_id: z.string(),
+  run_id: z.string(),
+  parent_step_id: z.string().nullable().optional(),
+  step_type: z.string(),
+  title: z.string(),
+  status: z.string(),
+  display_mode: z.string(),
+  sort_order: z.number(),
+  started_at: z.string(),
+  ended_at: z.string().nullable().optional(),
+  tool_name: z.string().nullable().optional(),
+  tool_call_id: z.string().nullable().optional(),
+  input_json: z.string().nullable().optional(),
+  output_json: z.string().nullable().optional(),
+  summary_text: z.string().nullable().optional(),
+});
+
+const runStepsDetailSchema = z.object({
+  run: runSummarySchema,
+  steps: z.array(runStepSchema),
+});
+
 const sendMessageResponseSchema = z.object({
   conversation: conversationSummarySchema,
+  messages: z.array(messageSchema),
+  reply: messageSchema,
+});
+
+const sendRunResponseSchema = z.object({
+  conversation: conversationSummarySchema,
+  run: runSummarySchema,
   messages: z.array(messageSchema),
   reply: messageSchema,
 });
@@ -31,73 +83,81 @@ const sendMessageResponseSchema = z.object({
 export type ConversationSummary = z.infer<typeof conversationSummarySchema>;
 export type ChatMessage = z.infer<typeof messageSchema>;
 export type ConversationDetail = z.infer<typeof conversationDetailSchema>;
+export type RunSummary = z.infer<typeof runSummarySchema>;
+export type ConversationRunsDetail = z.infer<typeof conversationRunsDetailSchema>;
+export type RunStep = z.infer<typeof runStepSchema>;
+export type RunStepsDetail = z.infer<typeof runStepsDetailSchema>;
 export type ToolCallPayload = NonNullable<ChatMessage["tool_calls"]>[number];
 export type ChatStreamEvent =
   | {
-      event: "user_message_accepted";
+      event: "run_started";
       data: {
+        run_id: string;
         conversation_id: string;
-        message_id: string;
-        timestamp: string;
+        user_message_id: string;
+        started_at: string;
         content: string;
       };
     }
   | {
-      event: "assistant_waiting";
+      event: "step_started";
       data: {
-        conversation_id: string;
-        timestamp: string;
-      };
-    }
-  | {
-      event: "assistant_message_started";
-      data: {
-        message_id: string;
-        timestamp: string;
-      };
-    }
-  | {
-      event: "assistant_delta";
-      data: {
-        message_id: string;
-        delta: string;
-      };
-    }
-  | {
-      event: "tool_started";
-      data: {
-        tool_call_id: string;
+        run_id: string;
+        step_id: string | null;
+        step_type: string;
+        title: string;
+        status: string;
+        display_mode: string;
         tool_name: string;
+        tool_call_id: string;
         args: Record<string, unknown>;
         timestamp: string;
       };
     }
   | {
-      event: "tool_finished";
+      event: "step_completed";
       data: {
-        tool_call_id: string;
+        run_id: string;
+        step_id: string | null;
+        step_type: string;
+        title: string;
+        status: string;
         tool_name: string;
-        tool_output: string;
+        tool_call_id: string;
+        output: string;
         timestamp: string;
       };
     }
   | {
-      event: "assistant_completed";
+      event: "assistant_final_delta";
       data: {
+        run_id: string;
+        message_id: string;
+        delta: string;
+      };
+    }
+  | {
+      event: "assistant_finalized";
+      data: {
+        run_id: string;
         message_id: string;
         timestamp: string;
         content: string;
       };
     }
   | {
-      event: "conversation_committed";
+      event: "run_completed";
       data: {
+        run_id: string;
         conversation_id: string;
+        final_message_id: string;
+        ended_at: string;
       };
     }
   | {
-      event: "error";
+      event: "run_failed";
       data: {
+        run_id?: string;
         message: string;
       };
     }
@@ -190,12 +250,39 @@ export async function sendMessage(conversationId: string, content: string) {
   );
 }
 
+export async function sendRun(conversationId: string, content: string) {
+  return request(
+    `/api/conversations/${conversationId}/runs`,
+    {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    },
+    sendRunResponseSchema,
+  );
+}
+
+export async function listConversationRuns(conversationId: string) {
+  return request(
+    `/api/conversations/${conversationId}/runs`,
+    { method: "GET" },
+    conversationRunsDetailSchema,
+  );
+}
+
+export async function getRunSteps(runId: string) {
+  return request(
+    `/api/runs/${runId}/steps`,
+    { method: "GET" },
+    runStepsDetailSchema,
+  );
+}
+
 export async function streamMessage(
   conversationId: string,
   content: string,
   onEvent: (event: ChatStreamEvent) => void | Promise<void>,
 ) {
-  const response = await fetch(`${API_BASE}/api/conversations/${conversationId}/messages/stream`, {
+  const response = await fetch(`${API_BASE}/api/conversations/${conversationId}/runs/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

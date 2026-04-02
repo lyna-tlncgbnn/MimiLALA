@@ -1,36 +1,77 @@
 # 文档索引
 
-这个目录是项目文档中心。
+`docs/` 是项目文档总入口。
 
 ## 从这里开始
 
-- `product/scope.md`：AgentBot 当前“要做什么、不做什么”
-- `product/roadmap.md`：已经完成的里程碑与下一步方向
-- `architecture/index.md`：系统架构总览
-- `runbooks/local-dev.md`：本地运行与开发方式
+- [README.md](/F:/AgentBot/README.md)
+  项目概览、快速启动、当前主链路
+- [architecture/index.md](/F:/AgentBot/docs/architecture/index.md)
+  当前系统的技术说明总览
+- [product/scope.md](/F:/AgentBot/docs/product/scope.md)
+  当前产品范围与非目标
+- [product/roadmap.md](/F:/AgentBot/docs/product/roadmap.md)
+  后续产品和工程方向
+- [runbooks/local-dev.md](/F:/AgentBot/docs/runbooks/local-dev.md)
+  本地开发、启动与验证
 
-## 文档地图
+## 文档分层
 
-- `architecture/`
-  - 系统结构
-  - graph flow
-  - persistence model
-  - frontend architecture
-  - streaming chat
-- `product/`
-  - scope
-  - roadmap
-- `exec-plans/active/`
-  - 正在执行的实现计划
-- `exec-plans/completed/`
-  - 已完成阶段归档
-- `exec-detail/`
-  - 每次执行完成后的实施记录与总结
-- `decisions/`
-  - 重要技术决策
-- `runbooks/`
-  - 本地开发、配置、调试说明
+### `architecture/`
+
+当前系统的技术真相：
+
+- 总体架构
+- runtime 主链路
+- 数据库与持久化
+- graph 执行流
+- streaming 协议
+- 前端读取模型
+- tools 层设计
+- 目录结构
+
+### `product/`
+
+项目做什么、不做什么，以及下一步方向：
+
+- `scope.md`
+- `roadmap.md`
+
+### `runbooks/`
+
+面向本地开发和排障：
+
+- 配置说明
+- 本地启动
+- 调试与排障
+
+### `exec-detail/`
+
+每次实际实施后的执行说明。  
+这些文档描述“做了什么”和“为什么这样改”，不是当前系统真相文档。
+
+### `exec-plans/completed/`
+
+历史阶段计划归档。  
+这些文档保留阶段性背景，不应替代当前技术文档。
+
+### `decisions/`
+
+关键技术决策记录。  
+早期 ADR 可能保留历史阶段结论，不一定等同于当前实现。
+
+## 当前阅读顺序建议
+
+如果你第一次进入这个项目，建议按这个顺序看：
+
+1. [README.md](/F:/AgentBot/README.md)
+2. [architecture/index.md](/F:/AgentBot/docs/architecture/index.md)
+3. [runbooks/local-dev.md](/F:/AgentBot/docs/runbooks/local-dev.md)
+4. [product/scope.md](/F:/AgentBot/docs/product/scope.md)
 
 ## 维护规则
 
-当代码行为、结构或工作流发生变化时，优先更新这里对应的文档，而不是在别处补零散说明。
+- 代码行为、主链路、存储模型或接口变化后，优先更新 `architecture/`
+- 启动方式、配置、排障方式变化后，更新 `runbooks/`
+- 功能边界和阶段目标变化后，更新 `product/`
+- 每次实作完成后，把实施过程写到 `exec-detail/`

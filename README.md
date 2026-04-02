@@ -1,43 +1,92 @@
 # AgentBot
 
-> 一个以学习为先、逐步成长为桌面 AI 应用的 LangGraph Agent 项目。
+一个已经完成桌面化主链路的 LangGraph Agent 工程项目。
 
-AgentBot 最初是一个分阶段推进的 LangGraph 学习项目，用来从底层理解 Agent 系统是如何工作的：真实模型调用、tool routing、短期对话历史，以及本地 execution logs。
+当前项目不再是早期的 CLI demo，而是一个完整的本地应用栈：
 
-目前它已经不再只是一个 CLI demo，而是演进成了一个带有本地 API、React 前端、Electron 桌面壳，以及流式聊天链路的桌面应用雏形。
-
-## 当前状态
-
-项目目前已经具备以下能力：
-
-- 基于 `langchain-openai` 的真实 LLM 调用
-- 基于 LangGraph 的 agent loop
-- 带条件路由的 tool calling
-- 本地 conversation persistence
-- 本地 execution event logging
-- 多会话 persistence 内核
-- FastAPI 本地服务入口
-- React 前端工程骨架
 - Electron 桌面壳
-- 基于 `SSE` 的 streaming chat 主链路
+- React 前端
+- FastAPI 本地 API
+- Python Agent Runtime
+- SQLite 应用数据存储
+- LangGraph SQLite Checkpoint
 
-### 当前已经实现
+## 当前项目定位
 
-当前项目已经可以：
+这个仓库的目标不是做“最小可运行玩具”，而是把一个可运行的 LangGraph Agent 逐步整理成可维护、可扩展、可观察的工程化项目。
 
-- 通过 OpenAI-compatible 接口与真实模型对话
-- 判断是否需要调用工具
-- 执行工具并继续模型循环
-- 保存 conversation 历史与 execution events
-- 在 persistence 内核中支持多个 conversation
-- 通过本地 API 完成 conversation CRUD
-- 在桌面端展示会话列表和聊天界面
-- 在桌面端进行流式聊天
-- 发送后立即显示 user 消息
-- 在 assistant 等待和 tool 执行期间展示明确状态
-- 以增量形式持续显示 assistant 回复
+当前已经具备：
 
-当前内置 tools 包括：
+- 真实模型调用
+- LangGraph agent loop
+- 条件化 tool routing
+- 本地多会话
+- run / step 数据模型
+- SQLite 主存储
+- LangGraph checkpoint 持久化
+- 基于 SSE 的流式聊天
+- 桌面端会话与执行过程展示
+
+## 当前主链路
+
+当前聊天主路径是：
+
+```text
+Electron
+  -> React UI
+    -> FastAPI Local API
+      -> ChatService
+        -> runner / streaming_runner
+          -> LangGraph
+            -> LLM + Tools + SQLite + Checkpoints
+```
+
+其中：
+
+- transcript 面向用户可见消息
+- run 面向一次任务执行
+- run_steps 面向执行过程展示
+- checkpoints 面向 LangGraph durable execution
+
+## 当前能力
+
+### Runtime
+
+- 基于 `langchain-openai` 的 OpenAI-compatible 模型接入
+- LangGraph `chatbot -> tools -> chatbot` 主循环
+- SQLite transcript / runs / run_steps / artifacts 表
+- LangGraph SQLite checkpointer
+- 同步执行与流式执行两套入口
+
+### API
+
+- `GET /api/conversations`
+- `POST /api/conversations`
+- `GET /api/conversations/{conversation_id}`
+- `PATCH /api/conversations/{conversation_id}`
+- `DELETE /api/conversations/{conversation_id}`
+- `GET /api/conversations/{conversation_id}/runs`
+- `POST /api/conversations/{conversation_id}/runs`
+- `POST /api/conversations/{conversation_id}/runs/stream`
+- `GET /api/runs/{run_id}`
+- `GET /api/runs/{run_id}/steps`
+
+兼容别名仍然存在：
+
+- `POST /api/conversations/{conversation_id}/messages`
+- `POST /api/conversations/{conversation_id}/messages/stream`
+
+但当前主路径已经是 run-oriented。
+
+### 前端
+
+- 多会话侧边栏
+- transcript + active run + historical runs 分离渲染
+- 执行过程折叠时间线
+- 最终回答 Markdown 渲染
+- 本地桌面窗口集成
+
+### 内置 Tools
 
 - `get_current_time`
 - `multiply`
@@ -50,70 +99,40 @@ AgentBot 最初是一个分阶段推进的 LangGraph 学习项目，用来从底
 ## 项目结构
 
 ```text
-desktop/         # Electron 桌面壳
-ui/              # React 前端
-agentbot/        # Python 后端核心
-docs/            # roadmap、architecture、plans、decisions、runbooks
-.agents/skills/  # 仓库级 Codex skills
-main.py          # CLI 入口
-config.json      # 本地运行配置
-workspace/       # 本地运行数据
+desktop/         Electron 桌面壳
+ui/              React 前端
+agentbot/        Python 后端与 Agent Runtime
+docs/            产品、架构、runbook、执行记录
+.agents/skills/  仓库级 Codex skills
+workspace/       本地运行数据
+main.py          CLI 入口
+config.json      本地运行配置
 ```
+
+## 本地存储
+
+当前主存储已经是 SQLite：
+
+- `workspace/agent_runtime.db`
+- `workspace/langgraph_checkpoints.db`
 
 其中：
 
-- `desktop/` 负责桌面窗口与本地后端进程管理
-- `ui/` 负责前端页面与交互
-- `agentbot/` 负责 Agent、API、persistence、services 和 tools
+- `agent_runtime.db` 保存 conversations / messages / runs / run_steps / artifacts
+- `langgraph_checkpoints.db` 保存 LangGraph thread checkpoints
 
-## 安装
-
-### 环境要求
-
-- Python `3.11+`
-- Node.js 与 `npm`
-- 一个 OpenAI-compatible model endpoint
-
-### Python 依赖
-
-推荐使用 `uv`：
-
-```powershell
-uv sync
-```
-
-或者：
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -e .
-```
-
-### 前端依赖
-
-```powershell
-cd ui
-npm install
-```
-
-### Electron 依赖
-
-```powershell
-cd desktop
-npm install
-```
+仓库里仍保留了早期 JSONL 模块用于迁移兼容和历史参考，但它们不再是当前聊天主链路的 source of truth。
 
 ## 配置
 
-在仓库根目录创建 `config.json`：
+运行配置来自仓库根目录的 `config.json`：
 
 ```json
 {
   "llm": {
     "api_key": "your_api_key",
     "base_url": "https://your-openai-compatible-endpoint/v1",
-    "model": "your-model-name",
+    "model": "gpt-4.1-mini",
     "temperature": 0.1
   },
   "debug": false
@@ -122,103 +141,92 @@ npm install
 
 说明：
 
-- `base_url` 支持 OpenAI-compatible provider，例如 Alibaba DashScope
-- `debug` 只控制是否把 execution 摘要打印到控制台
-- execution events 本身默认仍会落盘保存
+- `llm.api_key` 必填
+- `llm.base_url` 可选，默认走 OpenAI 官方地址
+- `llm.model` 默认 `gpt-4.1-mini`
+- `llm.temperature` 必须是数字
+- `debug` 控制控制台调试输出
 
-## 运行方式
+实现见：
 
-### 运行 CLI
+- [settings.py](/F:/AgentBot/agentbot/config/settings.py)
+
+## 安装
+
+### Python
+
+推荐：
+
+```powershell
+uv sync
+```
+
+### 前端
+
+```powershell
+cd ui
+npm install
+```
+
+### Electron
+
+```powershell
+cd desktop
+npm install
+```
+
+## 运行
+
+### CLI
 
 ```powershell
 .\.venv\Scripts\python.exe main.py
 ```
 
-### 单条输入
+### 单条 CLI 输入
 
 ```powershell
-.\.venv\Scripts\python.exe main.py "what time is it?"
+.\.venv\Scripts\python.exe main.py "你好"
 ```
 
-### 启动本地 FastAPI
+### FastAPI
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn agentbot.api.app:app --host 127.0.0.1 --port 8000
 ```
 
-### 启动前端
+### 前端开发
 
 ```powershell
 cd ui
 npm run dev
 ```
 
-### 启动 Electron 桌面端
+### Electron 开发
 
 ```powershell
 cd desktop
 npm run dev
 ```
 
-## 本地数据
+## 当前文档入口
 
-当前项目的本地运行数据位于：
+从这些文档开始最合适：
 
-```text
-workspace/
-  conversations/
-    default.json
-    <conversation_id>.jsonl
-  executions/
-    <conversation_id>.jsonl
-```
-
-其中：
-
-- `conversations/<conversation_id>.jsonl` 保存某个会话的消息历史
-- `executions/<conversation_id>.jsonl` 保存同一会话的 execution events
-- `conversations/default.json` 记录当前 CLI 默认会话指向的 `conversation_id`
-
-## 当前 Roadmap
-
-已经完成：
-
-- Phase 1：project skeleton
-- Phase 2：minimal agent loop
-- Phase 3：default conversation persistence
-- Phase 4：framework hardening
-- Phase 5：conversation meta 和 local execution logs
-- richer tools
-- multi-conversation persistence
-- desktop app foundation
-- streaming chat phase 1
-
-下一步建议方向：
-
-- execution log visualization
-- 更完整的 streaming 体验
-- 更完整的桌面设置与调试能力
-- long-term memory
-- subgraph 或 multi-agent 实验
-
-更完整的结构化项目文档请从 `docs/index.md` 开始看。
-
-## 设计原则
-
-AgentBot 遵循几条简单原则：
-
-- 每个阶段都保持项目可运行
-- 优先保持清晰边界，而不是过早抽象
-- 一次只增加一个有意义的 Agent 能力
-- 优先使用本地可检查的数据，让运行行为可观察
+- [docs/index.md](/F:/AgentBot/docs/index.md)：文档总入口
+- [docs/architecture/index.md](/F:/AgentBot/docs/architecture/index.md)：技术架构总览
+- [docs/product/scope.md](/F:/AgentBot/docs/product/scope.md)：当前产品范围
+- [docs/product/roadmap.md](/F:/AgentBot/docs/product/roadmap.md)：后续方向
+- [docs/runbooks/local-dev.md](/F:/AgentBot/docs/runbooks/local-dev.md)：本地开发和运行
 
 ## 当前边界
 
-这个项目当前仍然不包含：
+当前项目还没有完整实现：
 
-- checkpointer
-- long-term memory
-- execution 可视化面板
-- subgraph
-- multi-agent orchestration
+- 长期记忆
+- stop / resume / approval UI
+- subgraph / multi-agent orchestration
 - 完整自动化测试体系
+- 独立 tracing 平台接入
+
+但当前工程结构已经支持继续往这些方向演进，而不需要重写主链路。

@@ -1,40 +1,47 @@
-# 产品范围
+# Product Scope
 
 ## 项目定位
 
-AgentBot 是一个以学习为先、同时保持实用性的 LangGraph 项目。
+AgentBot 是一个以学习为起点、但当前已经具备工程化主链路的本地桌面 Agent 应用。
 
-它的目标不是一开始就做成复杂框架，而是通过渐进方式理解并构建一个真实可运行的 Agent 系统，并逐步把它演进成桌面应用。
+它不是通用云端平台，也不是浏览器 SaaS，而是：
+
+- 本地桌面宿主
+- 本地 FastAPI 服务
+- 本地 SQLite 持久化
+- LangGraph 驱动的任务执行系统
 
 ## 当前范围内
 
-- CLI 交互入口
-- Electron 桌面应用入口
-- React 前端界面
+当前明确包含：
+
+- CLI 入口
+- Electron 桌面壳
+- React 前端
 - FastAPI 本地 API
-- 通过 OpenAI-compatible chat API 进行真实模型调用
-- 基于 LangGraph 的 agent loop
-- tool calling 与 tool execution
-- 本地 conversation persistence
-- 本地 execution event logging
-- 多会话 persistence 内核
-- 桌面端 streaming chat
-- 可以继续扩展而不必重写的代码结构
+- OpenAI-compatible 模型调用
+- LangGraph agent loop
+- tool routing
+- SQLite transcript / runs / run_steps
+- LangGraph SQLite checkpoints
+- run-oriented SSE streaming
+- 执行区时间线 UI
 
-## 当前阶段暂不包含
+## 当前范围外
 
-- long-term memory
-- checkpointer integration
-- execution 可视化面板
-- tracing platform integration
-- subgraph
+当前明确不包含：
+
+- long-term memory 产品化能力
 - multi-agent orchestration
-- 浏览器版独立 Web 产品
-- 生产部署相关能力
+- subgraph 产品化编排
+- 云端部署平台
+- 团队协作后台
+- 完整 tracing SaaS
 
-## 工程原则
+## 当前工程原则
 
-- 每个阶段都保持项目可运行。
-- 优先保持清晰模块边界，而不是过早抽象。
-- 一次只增加一个有意义的新能力。
-- 优先使用可检查的本地数据，而不是隐藏的运行时状态。
+- 主链路优先
+- 数据模型先稳定，再扩功能
+- transcript 与 execution 分层
+- 前端以 persisted read model 为最终真相
+- 文档与代码同步更新

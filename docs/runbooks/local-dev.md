@@ -1,17 +1,11 @@
 # 本地开发
 
-## Python 依赖安装
+## Python 依赖
+
+推荐：
 
 ```powershell
 uv sync
-```
-
-或者：
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -e .
 ```
 
 ## 运行 CLI
@@ -20,21 +14,19 @@ pip install -e .
 .\.venv\Scripts\python.exe main.py
 ```
 
-## 运行单条输入
+运行单条输入：
 
 ```powershell
-.\.venv\Scripts\python.exe main.py "what time is it?"
+.\.venv\Scripts\python.exe main.py "你好"
 ```
 
-## 启动本地 FastAPI
+## 启动 FastAPI
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn agentbot.api.app:app --host 127.0.0.1 --port 8000
 ```
 
-## 前端开发
-
-前端位于 `ui/`，使用 Vite。
+## 启动前端
 
 ```powershell
 cd ui
@@ -42,9 +34,7 @@ npm install
 npm run dev
 ```
 
-## Electron 开发
-
-桌面壳位于 `desktop/`。
+## 启动 Electron
 
 ```powershell
 cd desktop
@@ -52,16 +42,21 @@ npm install
 npm run dev
 ```
 
-说明：
+## 当前开发建议
 
-- Electron 会负责加载前端页面
-- 当前 Electron 壳会启动本地 FastAPI 子进程
+常见本地联调顺序：
 
-## 当前开发说明
+1. 配好 `config.json`
+2. 启动 FastAPI
+3. 启动前端
+4. 如需桌面体验，再启动 Electron
 
-- 这个仓库目前还没有完整自动化测试套件
-- 当前验证方式主要包括：
-  - 跑 CLI
-  - 跑 FastAPI 路由
-  - 构建前端与 Electron
-  - 检查 `workspace/` 中的 persistence 落盘结果
+## 当前主要验证方式
+
+目前仍以手工联调为主：
+
+- 跑 CLI
+- 调 FastAPI
+- 检查前端 `npm run build`
+- 检查 `workspace/agent_runtime.db`
+- 检查 `workspace/langgraph_checkpoints.db`

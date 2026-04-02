@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
@@ -13,7 +14,11 @@ from agentbot.tools.error_handling import format_tool_error
 from agentbot.tools.registry import get_registered_tools
 
 
-def build_graph(llm: BaseChatModel):
+def build_graph(
+    llm: BaseChatModel,
+    *,
+    checkpointer: BaseCheckpointSaver | None = None,
+):
     """Build the minimal agent loop with model -> tools -> model."""
     tools = get_registered_tools()
     llm_with_tools = llm.bind_tools(tools)
@@ -29,4 +34,4 @@ def build_graph(llm: BaseChatModel):
         {"tools": "tools", "__end__": END},
     )
     graph.add_edge("tools", "chatbot")
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)

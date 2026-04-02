@@ -2,9 +2,9 @@
 
 ## 配置文件
 
-运行时配置从仓库根目录的 `config.json` 中读取。
+运行时配置来自仓库根目录的 `config.json`。
 
-## 当前字段
+当前主要结构：
 
 ```json
 {
@@ -20,12 +20,25 @@
 
 ## 字段说明
 
-- `llm.api_key` 必填
-- `llm.base_url` 可选
-- `llm.model` 省略时默认是 `gpt-4.1-mini`
-- `llm.temperature` 必须是数字
-- `debug` 必须是布尔值
+- `llm.api_key`
+  必填
+- `llm.base_url`
+  可选，使用 OpenAI-compatible 服务时可配置
+- `llm.model`
+  可选，默认是 `gpt-4.1-mini`
+- `llm.temperature`
+  数值型
+- `debug`
+  布尔型
 
-## 实现位置
+## 代码入口
 
-见 `agentbot/config/settings.py`。
+配置读取与校验位于：
+
+- `agentbot/config/settings.py`
+
+## 当前建议
+
+- 本地开发先确认 `api_key`
+- 如果接第三方兼容服务，再设置 `base_url`
+- 排障时可临时把 `debug` 设为 `true`

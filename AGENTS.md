@@ -1,64 +1,97 @@
 # Agent 指南
 
-这个仓库是一个以学习为先、逐步演进为桌面应用的 LangGraph Agent 项目。
+这份文件是仓库入口，不是完整设计文档。
 
-## 如何使用这份文件
+如果你要理解项目现状，优先看：
 
-把这份文件当作仓库入口，而不是完整文档本体。
-
-更详细的项目信息请看：
-
-- `README.md`：快速上手和当前能力概览
-- `docs/index.md`：文档总索引
-- `docs/product/roadmap.md`：产品方向和后续里程碑
-- `docs/architecture/index.md`：系统架构总览
-- `docs/exec-plans/active/`：当前正在执行的计划
-- `docs/exec-plans/completed/`：已完成阶段归档
-- `docs/exec-detail/`：执行完成后的实施总结
-- `docs/decisions/`：关键技术决策
-- `.agents/skills/`：仓库级 Codex skills
+- `README.md`
+- `docs/index.md`
+- `docs/architecture/index.md`
+- `docs/product/scope.md`
+- `docs/runbooks/local-dev.md`
 
 ## 当前项目形态
 
-当前项目已经形成四层结构：
+当前仓库已经形成完整本地应用结构：
 
 1. Electron 桌面壳
 2. React 前端
-3. FastAPI 本地服务
-4. Python Agent 核心
+3. FastAPI 本地 API
+4. Python Agent Runtime
+5. SQLite 主存储
+6. LangGraph SQLite checkpoint
 
-在聊天主链路上，桌面端已经具备基于 `SSE` 的 streaming chat。
+聊天主链路已经不是早期的 message-centric demo，而是：
 
-## 当前目标
+- conversation transcript
+- run
+- run_steps
+- checkpoints
 
-继续把这个项目建设成一个可维护的 LangGraph Agent 工程，具备：
+这几层分离的运行模型。
 
-1. 真实模型调用
-2. tool routing
-3. 本地 conversation persistence
-4. execution event logging
-5. 可扩展的桌面应用结构
-6. 基于 `SSE` 的流式聊天体验
-7. 继续向 execution 可视化、更完整 streaming 和更完整桌面体验扩展的空间
+## 当前主链路
 
-## 工作规则
+```text
+Electron
+  -> React UI
+    -> FastAPI
+      -> ChatService
+        -> runner / streaming_runner
+          -> LangGraph
+            -> LLM + Tools + SQLite + Checkpoints
+```
 
-- 优先做小步、可运行的改动，不做大范围重构。
-- 保持主流程可读、可检查。
-- 只有在当前代码真的需要时，才引入新的抽象。
-- 代码行为、结构或工作流变化后，要同步更新文档。
+前端当前主读取模型：
+
+- transcript：用户消息 + 最终回答
+- active run：当前执行态
+- historical runs：历史任务摘要与执行步骤
+
+## 当前主要目录
+
+- `desktop/`
+  Electron 壳层
+- `ui/`
+  React 前端
+- `agentbot/api/`
+  FastAPI 入口、schema、serializer、routes
+- `agentbot/app/`
+  CLI、同步 runner、流式 runner
+- `agentbot/graph/`
+  LangGraph builder、nodes、routes、checkpoint helpers
+- `agentbot/services/`
+  conversation / chat 服务层
+- `agentbot/storage/`
+  SQLite schema、repository、runtime shadow 持久化
+- `agentbot/tools/`
+  tool 定义与注册
+- `docs/`
+  产品、架构、runbook、执行记录
+
+## 当前工作规则
+
+- 优先保持主链路可运行。
+- 修改行为、结构或流程后，必须同步更新文档。
+- 先看清当前代码再改，不按旧文档盲改。
+- 结构性结论优先以 `docs/architecture/` 为准。
+- 执行记录写入 `docs/exec-detail/`，不要把实施过程混进技术说明文档。
 - 项目级 skills 统一放在 `./.agents/skills`。
-- 涉及 LangGraph / LangChain 相关能力判断时，优先先查可靠资料再做决定。
 
-## 当前边界
+## 当前事实边界
 
-这个仓库目前还不包含：
+当前已经具备：
 
-- checkpointer
-- long-term memory
-- execution 可视化面板
-- subgraph
-- multi-agent orchestration
+- SQLite transcript / runs / run_steps
+- LangGraph SQLite checkpointer
+- run-oriented SSE stream
+- 桌面端执行过程折叠时间线
+
+当前还没有完整具备：
+
+- 长期记忆
+- approval / interrupt UI
+- 多 agent 编排
 - 完整自动化测试体系
 
 ## 常用命令
@@ -75,7 +108,7 @@ uv sync
 .\.venv\Scripts\python.exe main.py
 ```
 
-启动本地 FastAPI：
+启动 FastAPI：
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn agentbot.api.app:app --host 127.0.0.1 --port 8000

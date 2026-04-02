@@ -2,334 +2,137 @@
 
 ## 当前目标
 
-当前前端不是一个独立部署的 Web 产品，而是桌面应用中的渲染层。
-它运行在 Electron 窗口中，通过本地 FastAPI 服务访问后端能力。
+当前前端不是通用 Web 聊天页，而是本地桌面 Agent 应用的交互层。
 
-整体关系如下：
+它运行在：
 
-```text
-Electron Shell
-  -> React UI
-    -> FastAPI Local API
-      -> Agent / Persistence / Tools
-```
+- React
+- Vite
+- Electron 宿主
 
-当前前端的核心职责是：
+并通过本地 FastAPI 与 Python 运行时通信。
 
-- 展示会话列表与消息内容
-- 提供聊天输入和流式返回体验
-- 调用本地 API 完成会话 CRUD 与消息发送
-- 管理少量本地 UI 状态
+## 当前读取模型
 
-当前前端不负责：
+前端当前已经不是单一 message list。
 
-- 直接调用 Python 对象
-- 直接读写本地 conversation 文件
-- 桌面窗口生命周期管理
+主界面读取模型分成三层：
 
-## 当前目录结构
+### 1. Transcript
 
-前端相关代码主要分布在以下目录：
+来自：
 
-```text
-ui/
-  src/
-    app/
-      App.tsx
-      app-shell.tsx
-      main.tsx
-      styles.css
-    assets/
-      logos/
-    features/
-      chat/
-        components/
-        layout/
-      conversations/
-        components/
-      settings/
-        components/
-    shared/
-      api/
-      lib/
-      ui/
-    state/
-      ui-store.ts
-    vite-env.d.ts
-  index.html
-  vite.config.ts
+- `GET /api/conversations/{conversation_id}`
 
-desktop/
-  electron/
-    main.js
-    preload.js
-```
+用于展示：
 
-## 分层说明
+- 用户可见历史消息
 
-### `ui/src/app`
+### 2. Active Run
 
-应用入口层。
+来自：
 
-负责：
+- 当前 SSE 流
+- `AppShell` 内部临时状态
 
-- React 应用挂载
-- Router 定义
-- QueryClient 注入
-- 页面全局壳子组织
-- 全局样式入口
+用于展示：
 
-当前主要文件：
+- 当前轮用户输入
+- 当前轮执行步骤
+- 当前轮最终回答的增量输出
 
-- `ui/src/app/main.tsx`
-- `ui/src/app/App.tsx`
-- `ui/src/app/app-shell.tsx`
-- `ui/src/app/styles.css`
+### 3. Historical Runs
 
-### `ui/src/features`
+来自：
 
-按业务域组织的前端功能模块。
+- `GET /api/conversations/{conversation_id}/runs`
+- `GET /api/runs/{run_id}/steps`
 
-当前拆分为：
+用于展示：
 
-- `features/chat`
-  负责聊天消息渲染、输入框、聊天顶部控制条
-- `features/conversations`
-  负责侧边栏、会话列表、会话项、重命名弹窗
-- `features/settings`
-  负责设置弹窗
+- 历史任务列表
+- 历史可展开执行过程
 
-这种分层的目标是把“功能域”聚合，而不是把所有组件都按视觉位置堆在一个 `components/` 目录里。
-
-### `ui/src/shared`
-
-跨业务域复用的公共层。
-
-包括：
-
-- `shared/ui`
-  通用 UI 基础组件，如 `button`、`dialog`、`scroll-area`
-- `shared/lib`
-  通用工具函数
-- `shared/api`
-  API 请求与响应结构定义
-
-### `ui/src/state`
-
-全局前端状态。
-
-当前使用 `zustand`，主要用于：
-
-- 侧边栏展开/收起
-- 侧边栏宽度
-- 设置弹窗开关
-- 重命名目标会话 id
-
-当前 store 位于：
-
-- `ui/src/state/ui-store.ts`
-
-## 页面与路由
-
-当前前端仍然围绕一个主界面运行，使用 `HashRouter`：
-
-- `/`
-- `/conversations/:conversationId`
-
-路由定义位于：
-
-- `ui/src/app/App.tsx`
-
-本质上仍然是同一个桌面主界面，只是随着 `conversationId` 变化切换当前会话。
-
-## 主界面结构
-
-当前主界面由 `AppShell` 组织：
+## 当前核心文件
 
 - `ui/src/app/app-shell.tsx`
-
-页面由两部分组成：
-
-### 左侧：Conversation Sidebar
-
-主要文件：
-
-- `ui/src/features/conversations/components/sidebar-panel.tsx`
-- `ui/src/features/conversations/components/sidebar-conversation-list.tsx`
-- `ui/src/features/conversations/components/sidebar-conversation-row.tsx`
-
-负责：
-
-- 展示会话列表
-- 新建会话
-- 选择会话
-- 重命名会话
-- 删除会话
-- 打开设置
-- 侧边栏宽度调整
-
-当前交互特点：
-
-- 侧边栏可展开/收起
-- 收起后左侧栏完全隐藏，不保留窄缝
-- 会话项使用 `...` 菜单承载重命名与删除
-- 侧边栏宽度可拖拽，并受最小/最大值约束
-
-### 右侧：Chat Surface
-
-主要文件：
-
 - `ui/src/features/chat/layout/chat-panel.tsx`
-- `ui/src/features/chat/layout/chat-header.tsx`
-- `ui/src/features/chat/components/message-list.tsx`
-- `ui/src/features/chat/components/chat-composer.tsx`
-
-负责：
-
-- 聊天顶部控制区
-- 消息列表展示
-- 空状态展示
-- 输入框与发送动作
-- 错误提示
-- 流式消息过程中的界面反馈
-
-当前结构上，聊天区已经拆成：
-
-- `ChatHeader`
-- `MessageList`
-- `ChatComposer`
-
-这样后续如果要继续扩展顶部区域，例如标题、更多按钮、模式切换，会更自然。
-
-## 状态管理
-
-当前前端状态可以分为三类：
-
-### 1. 远程数据状态
-
-使用 `@tanstack/react-query` 管理，主要包括：
-
-- 会话列表查询
-- 单个会话详情查询
-- 创建会话
-- 重命名会话
-- 删除会话
-
-### 2. 本地 UI 状态
-
-使用 `zustand` 管理，主要包括：
-
-- `sidebarCollapsed`
-- `sidebarWidth`
-- `settingsOpen`
-- `renameTargetId`
-
-### 3. 临时流式状态
-
-流式聊天主链路不只依赖后端最终落库后的 `messages`，前端还维护一层临时消息状态，用于承载：
-
-- optimistic user message
-- waiting assistant placeholder
-- streaming assistant message
-- tool running 状态
-- tool output 消息
-
-流结束后，这层临时状态会被最终 conversation 数据覆盖。
-
-## API 访问层
-
-前端访问后端 API 的入口位于：
-
+- `ui/src/features/chat/components/conversation-run-list.tsx`
+- `ui/src/features/chat/components/run-steps-panel.tsx`
 - `ui/src/shared/api/api.ts`
 
-这一层负责：
+## 当前界面原则
 
-1. 统一发起 `fetch`
-2. 用 `zod` 校验返回结构
-3. 解析 `SSE` 事件流
+当前前端的核心原则已经变成：
 
-当前主要方法包括：
+- transcript 和 execution 分开
+- tools 不作为普通聊天气泡
+- 执行区是时间线式可展开列表
+- 回答正文和执行过程分层呈现
 
-- `listConversations()`
-- `createConversation()`
-- `getConversation()`
-- `renameConversation()`
-- `deleteConversation()`
-- `sendMessage()`
-- `streamMessage()`
+## 执行区当前形态
 
-## 运行方式
+执行区当前通过：
 
-当前前端由 Vite 驱动。
+- `RunStepsPanel`
+- `@radix-ui/react-collapsible`
 
-开发阶段：
+构成时间线式 disclosure UI。
 
-- React 页面由 Vite dev server 提供
-- Electron 加载本地 Vite 地址
-- Electron main 进程同时启动本地 FastAPI
+当前方向是：
 
-默认连接关系：
+- 不做重卡片
+- 箭头贴文案
+- 点线作为时间线骨架
+- 详情作为 inline detail
 
-- React UI: `http://127.0.0.1:5173`
-- FastAPI: `http://127.0.0.1:8000`
+## 状态来源
 
-页面入口文件：
+### React Query
 
-- `ui/index.html`
-- `ui/src/app/main.tsx`
+管理远程数据：
 
-## Electron 与前端的关系
+- conversations
+- conversation detail
+- conversation runs
+- run steps
 
-Electron main 进程位于：
+### Local state
 
-- `desktop/electron/main.js`
+`AppShell` 当前还维护：
 
-当前流程是：
+- draft
+- activeRun
+- stream phase
+- stream error
 
-1. Electron 启动时创建窗口
-2. Electron 启动本地 FastAPI 子进程
-3. BrowserWindow 加载 React 页面地址
-4. React 页面通过 HTTP 请求本地 FastAPI
+### Zustand
 
-preload 位于：
+管理全局 UI 状态：
 
-- `desktop/electron/preload.js`
+- sidebar collapsed
+- sidebar width
+- settings dialog
+- rename target
 
-当前 preload 仍然保持最小桥接，不承担业务逻辑。
-也就是说：
+## 当前 API 层
 
-- 前端业务仍然是标准 React + HTTP 结构
-- Electron 主要是运行容器，而不是业务层
+`ui/src/shared/api/api.ts` 当前已内建：
 
-## 当前验证状态
+- zod schema
+- fetch 封装
+- SSE parser
 
-当前桌面前端链路已经完成以下验证：
+并且当前主流式接口已经切到：
 
-- Vite 前端可构建
-- Electron 可加载当前前端页面
-- 本地 FastAPI 接口可工作
-- 会话 CRUD 主链路可用
-- SSE streaming chat 主链路可用
-- 侧边栏宽度与展开收起交互可用
+- `/runs/stream`
 
-## 当前边界
+## 当前限制
 
-当前前端架构明确不包含：
+当前前端仍未覆盖：
 
-- 浏览器版独立产品
-- 多窗口 UI
-- execution 可视化面板
-- 复杂设置系统
-- 直接操作 Python 本地文件
-- MCP / browser / shell 等高级交互界面
-
-## 可扩展方向
-
-在当前结构下，后续更自然的扩展方向包括：
-
-- 增加 execution 日志面板
-- 增加更完整的 streaming 事件展示
-- 增加更丰富的顶部控制区
-- 增加 conversation 搜索与筛选
-- 增加更完整的 settings 面板
-- 增加品牌资源、空状态与消息展示的统一设计系统
+- 停止生成
+- execution artifacts 面板
+- 多窗口同步
+- 更复杂的 run 对账可视化
+- 全自动端到端 UI 测试

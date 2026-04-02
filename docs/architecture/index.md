@@ -1,97 +1,63 @@
 # 架构总览
 
-AgentBot 当前已经从单一 CLI 学习项目演进成一个带有桌面端、前端、本地 API 和 Python Agent 核心的本地桌面应用架构。
-
-整体分层可以概括为：
+当前 AgentBot 是一个本地桌面 Agent 应用，主结构如下：
 
 ```text
 Electron Shell
   -> React UI
     -> FastAPI Local API
-      -> Agent / Persistence / Tools
+      -> ChatService
+        -> runner / streaming_runner
+          -> LangGraph
+            -> LLM + Tools + SQLite + Checkpoints
 ```
 
-在聊天主链路上，当前还新增了一条 streaming 路径：
+## 当前架构事实
 
-```text
-React UI
-  -> POST /api/conversations/{id}/messages/stream
-    -> FastAPI SSE
-      -> streaming_runner
-        -> LangGraph graph.stream(...)
-```
+- 主存储已经是 SQLite，而不是 JSONL
+- LangGraph 已接入 SQLite checkpointer
+- 聊天主链路已经是 run-oriented，而不是扁平 message-centric
+- 前端当前按 transcript、active run、historical runs 分离渲染
+- tools 不再作为普通聊天气泡渲染
 
-## 核心模块
+## 当前核心模块
 
 - `desktop/`
-  Electron 桌面壳，负责窗口管理与本地后端进程管理
+  Electron 窗口与本地进程壳层
 - `ui/`
-  React 前端，负责会话列表、聊天区、输入区和本地 API 调用
+  React 前端和本地交互界面
 - `agentbot/api/`
-  FastAPI 本地服务入口，负责把 Python 能力暴露给前端
+  FastAPI 入口与 HTTP/SSE 路由
 - `agentbot/services/`
-  conversation 与 chat 的业务语义层
+  conversation 与 chat 服务层
 - `agentbot/app/`
-  CLI 入口、同步 runner 与 streaming runner
+  CLI、同步 runner、流式 runner
 - `agentbot/graph/`
-  LangGraph 主循环
-- `agentbot/memory/`
-  conversation 与 execution persistence
+  LangGraph 构建与 checkpoint 接入
+- `agentbot/storage/`
+  SQLite schema、repository、shadow runtime
 - `agentbot/tools/`
-  tools 定义与自动注册
+  tool 定义与注册
 
-## 关键链路
+## 推荐阅读顺序
 
-当前项目存在三条主要运行链路。
+1. [runtime-architecture.md](/F:/AgentBot/docs/architecture/runtime-architecture.md)
+   运行时主模型与整体设计
+2. [database.md](/F:/AgentBot/docs/architecture/database.md)
+   SQLite 数据模型与持久化边界
+3. [runtime-flow.md](/F:/AgentBot/docs/architecture/runtime-flow.md)
+   从前端到 LangGraph 再到持久化的主链路
+4. [streaming-chat.md](/F:/AgentBot/docs/architecture/streaming-chat.md)
+   SSE 事件、active run 与前端流式状态
+5. [frontend.md](/F:/AgentBot/docs/architecture/frontend.md)
+   前端读取模型与界面分层
+6. [graph-flow.md](/F:/AgentBot/docs/architecture/graph-flow.md)
+   LangGraph 图执行结构
+7. [tools.md](/F:/AgentBot/docs/architecture/tools.md)
+   tools 层设计
+8. [project-structure.md](/F:/AgentBot/docs/architecture/project-structure.md)
+   目录结构与模块职责
 
-### 1. CLI 链路
+## 兼容说明
 
-- 用户通过 CLI 输入
-- `runner` 加载配置、history、tools 和 graph
-- graph 执行模型与工具循环
-- 结果写回 conversation 与 execution storage
-
-### 2. 桌面端非流式链路
-
-- Electron 启动桌面窗口
-- Electron 启动本地 FastAPI
-- React 前端通过 HTTP 调用本地 API
-- API 通过 services 层调用 runner 与 persistence
-- 返回 conversation 状态与消息结果给前端
-
-### 3. 桌面端流式聊天链路
-
-- 前端调用 `POST /api/conversations/{conversation_id}/messages/stream`
-- FastAPI 以 `text/event-stream` 持续推送事件
-- `streaming_runner` 驱动单轮 LangGraph 流式执行
-- assistant 文本增量、tool 生命周期事件和最终提交事件持续发回前端
-- 前端用 live message 层叠加到持久化消息之上
-- 流结束后重新拉取最终 conversation，保证 UI 与持久化结果一致
-
-## 当前阶段特征
-
-当前架构已经具备：
-
-- CLI 与桌面端双入口
-- 本地 FastAPI 服务入口
-- 多会话 persistence 内核
-- 文件相关 tools
-- Electron + React 桌面应用基础设施
-- 基于 `SSE` 的 streaming chat 主链路
-
-当前仍未包含：
-
-- checkpointer
-- execution 可视化面板
-- 更复杂的桌面设置系统
-- subgraph
-- multi-agent orchestration
-
-## 相关文档
-
-- `graph-flow.md`
-- `frontend.md`
-- `streaming-chat.md`
-- `project-structure.md`
-- `persistence.md`
-- `tools.md`
+旧文件 [agent-runtime-redesign.md](/F:/AgentBot/docs/architecture/agent-runtime-redesign.md) 仍保留为历史入口兼容说明，但当前正式技术说明应以 `runtime-architecture.md` 为准。

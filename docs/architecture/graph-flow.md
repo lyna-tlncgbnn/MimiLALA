@@ -1,65 +1,91 @@
 # Graph Flow
 
-## 当前 graph 结构
+## 当前图结构
 
-当前 graph 在 `agentbot/graph/builder.py` 中组装，整体形状如下：
+当前 LangGraph 主 loop 仍然保持简洁：
 
 ```text
 START -> chatbot -> route -> tools -> chatbot -> END
 ```
 
-其中 `route` 这一步是通过 `add_conditional_edges()` 和 `tools_condition()` 实现的。
+关键构建文件：
 
-## graph 在整体架构中的位置
+- `agentbot/graph/builder.py`
 
-graph 仍然是当前 Agent 核心执行层，CLI、FastAPI 和桌面端都会复用这套 LangGraph 执行逻辑。
+## 节点职责
 
-区别只在于入口不同：
+### `chatbot`
 
-- CLI 通过 `agentbot/app/cli.py` -> `agentbot/app/runner.py`
-- 非流式 API 通过 `agentbot/api/` -> `agentbot/services/` -> `agentbot/app/runner.py`
-- 流式聊天 API 通过 `agentbot/api/` -> `agentbot/services/` -> `agentbot/app/streaming_runner.py`
+负责：
 
-也就是说，桌面端与 FastAPI 并没有替代 graph，而是把 graph 包在新的服务入口后面。
+- 调用已绑定 tools 的 chat model
+- 产出 assistant 内容
+- 决定是否发起 tool calls
 
-## 同步执行流程
+### `route`
 
-1. `agentbot/app/runner.py` 构造输入消息列表，内容包括：
-   - system prompt
-   - 已保存的 conversation history
-   - 当前用户输入
-2. `chatbot` 节点调用已经绑定 tools 的 chat model。
-3. `route_after_chatbot` 判断 AIMessage 是否发出了 tool calls。
-4. 如果存在 tool calls，则由 `tools` 节点通过 `ToolNode` 执行。
-5. 工具执行结果重新送回 `chatbot`。
-6. 当模型不再发出 tool calls 时，graph 结束，并返回最终 AIMessage。
-7. runner 将最新消息写回 conversation storage，并将执行事件写回 execution storage。
+负责：
 
-## 流式执行流程
+- 根据 `AIMessage` 中是否存在 tool calls 决定下一步
+- 无 tool calls 时结束
+- 有 tool calls 时进入 `tools`
 
-在 streaming chat 主链路中，不再走“整轮结束后一次性返回”的模式，而是走 streaming runner：
+### `tools`
 
-1. 前端调用 `POST /api/conversations/{conversation_id}/messages/stream`
-2. FastAPI 把请求交给 chat service
-3. chat service 调用 `agentbot/app/streaming_runner.py`
-4. streaming runner 基于 LangGraph `graph.stream(...)` 消费流式事件
-5. assistant 文本增量、tool 生命周期状态与最终提交事件持续通过 `SSE` 发给前端
-6. 流结束后 conversation 仍会按现有 persistence 模型落盘
-7. 前端重新拉取最终 conversation，完成和持久化结果的对齐
+负责：
 
-## 当前 state model
+- 执行注册的工具
+- 把工具结果回送给 graph
 
-当前 graph 仍然直接使用 `MessagesState`。
+## 当前状态模型
 
-这意味着：
+当前 graph 仍然主要围绕消息状态运行，但运行时 durability 已经增强。
 
-- 当前主状态仍然围绕消息列表组织
-- 还没有引入自定义 typed state
-- conversation 切换、多会话 persistence 和 API 增强仍然发生在 graph 外层，而不是 state 结构内部
+当前特点：
 
-## 当前限制
+- conversation 级 `thread_id`
+- SQLite checkpointer
+- 共享同步/流式入口
 
-- 没有 checkpointer
-- 没有 subgraph
-- 除 `messages` 外没有额外的自定义 state 字段
-- 流式能力当前只覆盖聊天主链路，不包含 execution 可视化联动
+## Checkpoint 集成
+
+当前 graph 编译时已经接入：
+
+- `agentbot/graph/checkpoints.py`
+
+核心对象：
+
+- `SqliteSaver`
+
+当前规则：
+
+- `conversation_id` 直接作为 `thread_id`
+- 如果线程已有 checkpoint，则后续轮次从 checkpoint 恢复
+- 旧 conversation 切入新架构时，必要时先做 seed
+
+## 同步与流式的关系
+
+两条执行路径都会复用同一个 graph：
+
+- `runner.py`
+- `streaming_runner.py`
+
+不同点不在 graph 结构，而在：
+
+- 如何消费事件
+- 如何向前端返回
+- 如何组织本轮 UI 体验
+
+## 当前边界
+
+当前 graph 仍然没有系统化引入：
+
+- subgraph
+- multi-agent orchestration
+- long-term memory state
+- 复杂 typed state machine
+
+当前设计仍然偏向：
+
+- 小而稳的 agent loop
+- 在 graph 外层做产品级数据建模
