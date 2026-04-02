@@ -67,6 +67,9 @@ agentbot/tools/
 - `write_file`
 - `read_pdf`
 - `read_docx`
+- `read_xlsx`
+- `read_pptx`
+- `batch_read_documents`
 
 ### 代码库查找工具
 
@@ -200,6 +203,13 @@ tool 的主要元数据仍然来自：
 - 超出项目根目录的访问会被拒绝
 - 读写行为都走统一路径解析
 
+当前这层除了基础文本和 PDF 读取外，也开始承接面向普通用户的办公文档能力：
+
+- DOCX：段落、标题、表格
+- XLSX：sheet 列表与预览行
+- PPTX：按 slide 提取文本
+- batch 文档读取：目录内多文件预览
+
 为了避免这套边界在更多 tool 中重复实现，当前公共路径与截断逻辑已经被抽到：
 
 - `common.py`
@@ -282,5 +292,12 @@ tool 的主要元数据仍然来自：
 - 不支持 `shell=True`
 - 不支持管道、重定向、组合命令
 - 不支持任意 PowerShell 脚本执行
+
+当前办公文档工具也仍然保持第一版边界：
+
+- `read_docx` 主要覆盖段落、标题和表格文本
+- `read_xlsx` 目前聚焦 `.xlsx`，返回 sheet 与预览行，不做复杂公式计算
+- `read_pptx` 目前聚焦文本提取，不处理复杂图表语义
+- `batch_read_documents` 当前只扫描目录第一层，不递归子目录
 
 但当前结构已经足够支撑后续继续加很多 tool，而不会马上混乱。

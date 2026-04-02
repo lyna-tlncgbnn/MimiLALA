@@ -101,6 +101,9 @@ Electron
 - `run_command`
 - `read_pdf`
 - `read_docx`
+- `read_xlsx`
+- `read_pptx`
+- `batch_read_documents`
 - `web_search`
 - `fetch_url`
 
