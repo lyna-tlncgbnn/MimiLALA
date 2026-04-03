@@ -53,9 +53,15 @@ Electron Shell
    前端读取模型与界面分层
 6. [graph-flow.md](/F:/AgentBot/docs/architecture/graph-flow.md)
    LangGraph 图执行结构
-7. [tools.md](/F:/AgentBot/docs/architecture/tools.md)
+7. [browser-use-migration-todo.md](/F:/AgentBot/docs/architecture/browser-use-migration-todo.md)
+   浏览器子图继续向 `browser-use` 靠拢的迁移清单
+8. [browser-observation-pipeline.md](/F:/AgentBot/docs/architecture/browser-observation-pipeline.md)
+   浏览器 observation 的 raw capture -> serialization 分层
+9. [browser-planner-state.md](/F:/AgentBot/docs/architecture/browser-planner-state.md)
+   浏览器子图 planner state 的字段与当前边界
+10. [tools.md](/F:/AgentBot/docs/architecture/tools.md)
    tools 层设计
-8. [project-structure.md](/F:/AgentBot/docs/architecture/project-structure.md)
+11. [project-structure.md](/F:/AgentBot/docs/architecture/project-structure.md)
    目录结构与模块职责
 
 ## 兼容说明

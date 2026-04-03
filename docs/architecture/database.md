@@ -133,8 +133,8 @@ checkpoint 数据库由：
 
 当前行为：
 
-- `conversation_id` 直接作为 `thread_id`
-- runner / streaming_runner 每轮都传入 `thread_config(thread_id)`
+- `thread_id` 是 run 级字段，不再直接等于 `conversation_id`
+- runner / streaming_runner 每轮都传入当前 run 对应的 `thread_config(thread_id)`
 - 如果线程已有 checkpoint，则基于 checkpoint 恢复
 - 如果是迁移旧会话且尚无 checkpoint，则会先做 seed，再进入 checkpoint 模式
 

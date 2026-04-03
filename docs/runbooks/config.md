@@ -1,10 +1,16 @@
-# 配置说明
+# Config
 
-## 配置文件
+## 位置
 
-运行时配置来自仓库根目录的 `config.json`。
+运行配置来自仓库根目录的 `config.json`。
 
-当前主要结构：
+主要入口：
+
+- [settings.py](/F:/AgentBot/agentbot/config/settings.py)
+- [browser_nodes.py](/F:/AgentBot/agentbot/graph/browser_nodes.py)
+- [session.py](/F:/AgentBot/agentbot/browser/session.py)
+
+## 示例
 
 ```json
 {
@@ -12,114 +18,141 @@
     "api_key": "your_api_key",
     "base_url": "https://your-openai-compatible-endpoint/v1",
     "model": "your-model-name",
-    "temperature": 0.1
-  },
-  "search": {
-    "provider": "tavily",
-    "api_key": "your_search_api_key",
-    "max_results": 5,
-    "timeout_seconds": 12
-  },
-  "command": {
-    "enabled": true,
-    "default_timeout_seconds": 20,
-    "max_timeout_seconds": 60,
-    "max_output_chars": 12000,
-    "allowed_programs": [
-      ".venv\\Scripts\\python.exe",
-      "python",
-      "uv",
-      "npm"
-    ],
-    "blocked_patterns": [
-      "del ",
-      "remove-item",
-      "rmdir",
-      ">",
-      "|",
-      "&&"
-    ]
+    "temperature": 0.1,
+    "max_tokens": 4096,
+    "top_p": 1.0,
+    "frequency_penalty": 0.0,
+    "presence_penalty": 0.0,
+    "request_timeout_seconds": 120,
+    "max_retries": 2,
+    "reasoning_effort": null,
+    "reasoning": null,
+    "extra_body": {},
+    "default_headers": {}
   },
   "browser": {
-    "headless": true
+    "headless": false,
+    "close_on_finish": false,
+    "max_actions": 12,
+    "max_actions_per_step": 3,
+    "mode": "system",
+    "window_width": 1440,
+    "window_height": 900,
+    "no_viewport": true,
+    "start_maximized": false,
+    "channel": "chrome",
+    "profile_directory": "Default",
+    "temp_profiles_dir": "workspace/browser_profiles",
+    "copy_local_profile": true,
+    "artifacts_dir": "workspace/browser_artifacts",
+    "downloads_dir": "workspace/browser_downloads"
   },
   "debug": false
 }
 ```
 
-## 配置边界
+## 浏览器配置
 
-当前项目统一采用下面这条规则：
-
-- 应用级配置放 `config.json`
-- 运行数据 / UI 状态放 SQLite 或前端本地状态
-
-这意味着：
-
-### 放在 `config.json` 的
-
-- `llm.*`
-- `search.*`
-- `command.*`
-- `browser.*`
-- 以后可能的 provider 选择、默认超时、默认参数、功能开关
-
-### 不放在 `config.json` 的
-
-- 当前选中的 conversation
-- draft 内容
-- 执行区展开状态
-- 侧边栏宽度
-- transcript / runs / run_steps
-
-这些属于运行数据或 UI 状态，不属于应用级配置。
-
-## 字段说明
+## LLM 配置
 
 - `llm.api_key`
-  必填
+  必填。
+
 - `llm.base_url`
-  可选，使用 OpenAI-compatible 服务时可配置
+  可选，适用于 OpenAI-compatible 服务。
+
 - `llm.model`
-  可选，默认是 `gpt-4.1-mini`
+  模型名。
+
 - `llm.temperature`
-  数值型
-- `search.provider`
-  当前搜索 provider，第一版支持 `tavily`
-- `search.api_key`
-  搜索服务 API key
-- `search.max_results`
-  搜索工具默认返回结果数，范围建议 1 到 10
-- `search.timeout_seconds`
-  搜索请求超时秒数
-- `command.enabled`
-  是否启用 `run_command`
-- `command.default_timeout_seconds`
-  默认命令超时秒数
-- `command.max_timeout_seconds`
-  允许的最大超时秒数
-- `command.max_output_chars`
-  stdout / stderr 的截断上限
-- `command.allowed_programs`
-  允许执行的程序白名单
-- `command.blocked_patterns`
-  明确禁止出现在命令字符串中的危险模式
-- `browser.headless`
-  是否以后台模式运行浏览器子图。`true` 表示后台执行，`false` 表示弹出可见浏览器窗口
-- `debug`
-  布尔型
+  采样温度。
 
-## 代码入口
+- `llm.max_tokens`
+  最大输出 token 数。
 
-配置读取与校验位于：
+- `llm.top_p`
+  nucleus sampling 参数。
 
-- `agentbot/config/settings.py`
+- `llm.frequency_penalty` / `llm.presence_penalty`
+  常见惩罚项参数。
+
+- `llm.request_timeout_seconds`
+  单次请求超时时间。
+
+- `llm.max_retries`
+  请求失败后的重试次数。
+
+- `llm.reasoning_effort`
+  对支持 reasoning 的兼容模型，可设置 `low` / `medium` / `high` 一类值。
+
+- `llm.reasoning`
+  可选对象，用于更细的 reasoning 配置。
+
+- `llm.extra_body`
+  provider-specific 请求体透传入口。
+  如果某个 OpenAI-compatible 平台把 `thinking`、`seed`、`response_format` 之类的参数放在自定义 body 里，这里可以直接传。
+
+- `llm.default_headers`
+  provider-specific 请求头透传入口。
+
+- `browser.mode`
+  浏览器运行模式。
+  `system`：优先使用本机 Chrome/Edge，并把本地 profile 复制到 workspace 下的临时目录后启动。
+  `playwright`：保留旧的 Playwright 隔离浏览器模式。
+
+- `browser.channel`
+  可选浏览器渠道，例如 `chrome`、`msedge`。主要用于帮助 system 模式优先选择本机浏览器。
+
+- `browser.executable_path`
+  可选，显式指定浏览器可执行文件路径。设置后优先级最高。
+
+- `browser.user_data_dir`
+  可选，显式指定本地浏览器 `User Data` 根目录。
+
+- `browser.profile_directory`
+  可选，指定要复制的本地 profile 目录，比如 `Default`、`Profile 1`。
+
+- `browser.temp_profiles_dir`
+  临时 profile 根目录。建议放在 workspace 下，例如：
+  `workspace/browser_profiles`
+
+- `browser.copy_local_profile`
+  是否在启动前把本地 profile 复制到临时目录。
+  默认应为 `true`，这样更接近 browser-use 的本地模式，也避免直接占用原始 profile。
+
+- `browser.window_width` / `browser.window_height`
+  浏览器窗口大小。
+
+- `browser.no_viewport`
+  `true` 时，页面内容跟随真实窗口伸缩，适合可见浏览器模式。
+
+- `browser.viewport_width` / `browser.viewport_height`
+  仅在 `browser.no_viewport=false` 时使用。
+
+- `browser.artifacts_dir`
+  浏览器 session 的截图、页面快照等 artifacts 根目录。
+
+- `browser.downloads_dir`
+  下载文件根目录。
+  如果未设置，会回落到当前 session 的 artifacts 目录下。
+
+## 默认目录
+
+推荐目录：
+
+- 临时 profile：`F:/AgentBot/workspace/browser_profiles`
+- artifacts：`F:/AgentBot/workspace/browser_artifacts`
+- downloads：`F:/AgentBot/workspace/browser_downloads`
+
+每个浏览器 session 会继续在 artifacts 根目录下创建自己的子目录。
 
 ## 当前建议
 
-- 本地开发先确认 `api_key`
-- 如果接第三方兼容服务，再设置 `base_url`
-- 如需联网搜索，补充 `search` 段
-- 如需受限本地命令执行，补充并调整 `command` 段
-- 如需可见浏览器窗口，把 `browser.headless` 改成 `false`
-- 排障时可临时把 `debug` 设为 `true`
+如果你希望浏览器更接近真实本地使用方式，建议：
+
+- `browser.mode = "system"`
+- `browser.no_viewport = true`
+- `browser.copy_local_profile = true`
+- `browser.temp_profiles_dir = "workspace/browser_profiles"`
+
+这样浏览器会优先复用你本机浏览器环境，再复制到 workspace 临时 profile 中运行，而不是直接起一个全新的隔离 Chromium context。

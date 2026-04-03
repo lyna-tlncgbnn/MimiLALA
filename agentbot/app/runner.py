@@ -11,7 +11,7 @@ from agentbot.app.graph_runtime_events import apply_runtime_events_from_updates
 from agentbot.app.debug import DebugPrinter
 from agentbot.config.settings import Settings
 from agentbot.graph.builder import build_graph
-from agentbot.graph.checkpoints import sqlite_checkpointer, thread_config, thread_has_checkpoints
+from agentbot.graph.checkpoints import sqlite_checkpointer, thread_config
 from agentbot.models.llm import build_llm
 from agentbot.prompts.system import get_system_prompt
 from agentbot.services.sqlite_conversations import SQLiteConversationService
@@ -48,7 +48,6 @@ def run_once(user_text: str, conversation_id: str | None = None) -> str:
     except Exception as exc:
         raise AgentBotError(f"Failed to load conversation history: {exc}") from exc
 
-    thread_id = meta.conversation_id
     user_message_id = _new_prefixed_id("msg")
     user_timestamp = _now_iso()
     user_message = HumanMessage(
@@ -61,24 +60,21 @@ def run_once(user_text: str, conversation_id: str | None = None) -> str:
         },
     )
     active_run = _safe_start_run(runtime_writer, meta=meta, user_message=user_message)
+    thread_id = active_run.run_id if active_run is not None else _new_prefixed_id("run")
 
     debug.log(f"tools registered: {', '.join(tool.name for tool in tools)}")
     debug.log("graph execution started")
 
     try:
         with sqlite_checkpointer() as checkpointer:
-            seeded_from_transcript = not thread_has_checkpoints(checkpointer, thread_id)
             input_messages = _build_input_messages(
                 conversation_service=conversation_service,
                 conversation_id=meta.conversation_id,
                 user_message=user_message,
-                seed_from_transcript=seeded_from_transcript,
+                seed_from_transcript=True,
             )
             graph = build_graph(llm, checkpointer=checkpointer)
-            debug.log(
-                "loaded conversation state: "
-                f"{'transcript seed' if seeded_from_transcript else 'checkpoint resume'}"
-            )
+            debug.log("loaded conversation state: transcript seed (per-run thread)")
             emitted_tool_calls: set[str] = set()
             final_values: dict | None = None
             for chunk in graph.stream(

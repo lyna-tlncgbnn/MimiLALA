@@ -8,6 +8,12 @@
   项目概览、快速启动、当前主链路
 - [architecture/index.md](/F:/AgentBot/docs/architecture/index.md)
   当前系统的技术说明总览
+- [architecture/browser-use-migration-todo.md](/F:/AgentBot/docs/architecture/browser-use-migration-todo.md)
+  浏览器子图继续借鉴 `browser-use` 的迁移清单与下一步顺序
+- [architecture/browser-observation-pipeline.md](/F:/AgentBot/docs/architecture/browser-observation-pipeline.md)
+  浏览器 observation 的 raw capture -> serialization 分层说明
+- [architecture/browser-planner-state.md](/F:/AgentBot/docs/architecture/browser-planner-state.md)
+  浏览器子图 planner state 的字段与当前边界
 - [product/scope.md](/F:/AgentBot/docs/product/scope.md)
   当前产品范围与非目标
 - [product/roadmap.md](/F:/AgentBot/docs/product/roadmap.md)

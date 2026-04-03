@@ -7,14 +7,14 @@
 ```text
 desktop/    Electron 桌面壳
 ui/         React 前端
-agentbot/   Python 后端与 Agent 运行时
+agentbot/   Python 后端与 Agent Runtime
 docs/       项目文档
 ```
 
 此外还有：
 
-- `workspace/` 本地运行时数据库与产物
-- `.agents/skills/` 仓库级技能
+- `workspace/` 本地运行时数据库与浏览器 artifacts
+- `.agents/skills/` 仓库级 skills
 
 ## 运行入口
 
@@ -62,14 +62,29 @@ FastAPI 接口层：
 浏览器子图支撑层：
 
 - `actions.py`
+  结构化浏览器动作执行与动作后副作用处理
 - `session.py`
+  Playwright 会话生命周期、runtime 事件记录、下载目录管理
 - `dom_service.py`
+  页面 observation、交互元素提取、稳定 selector 映射、frame-aware 页面摘要
+- `observation_capture.py`
+  raw capture 层，采集 main document / iframe document、candidate elements、headings、landmarks、page info
+- `observation_serialize.py`
+  serialization 层，负责 candidate ranking、semantic groups、prioritized hints、`BrowserStateSummary` 输出
 - `loop_detection.py`
+  轻量 loop detection 与页面指纹
 - `views.py`
+  浏览器子图的数据模型与结构化动作模型
+
+当前职责边界：
+
+- 负责浏览器子图内部 runtime
+- 不负责主图普通 tools 调度
+- 不负责完整 `browser-use` event bus / watchdog 基础设施
 
 ### `agentbot/graph/`
 
-LangGraph 构建和 checkpoint 接入：
+LangGraph 构建与 checkpoint 接入：
 
 - `builder.py`
 - `browser_nodes.py`
@@ -78,6 +93,15 @@ LangGraph 构建和 checkpoint 接入：
 - `checkpoints.py`
 - `nodes.py`
 - `routes.py`
+
+其中浏览器相关职责是：
+
+- `browser_subgraph.py`
+  组装浏览器子图
+- `browser_nodes.py`
+  浏览器子图的 prepare / observe / decide / act / evaluate / finish 节点
+- `browser_routes.py`
+  浏览器子图条件路由
 
 ### `agentbot/storage/`
 
@@ -91,7 +115,7 @@ SQLite 主存储：
 
 ### `agentbot/tools/`
 
-工具模块与注册：
+普通工具模块与注册：
 
 - `basic.py`
 - `codebase.py`
@@ -105,11 +129,23 @@ SQLite 主存储：
 - `infra/`
 - `providers/`
 
+### `agentbot/prompts/`
+
+提示词模块：
+
+- `system.py`
+- `browser_subgraph.py`
+
+其中 `browser_subgraph.py` 当前职责是：
+
+- 保持浏览器子图单动作 planner 协议
+- 借鉴 `browser-use` 的高价值浏览器规则
+- 不直接迁移 `browser-use` 完整多动作 agent loop 输出格式
+
 ### `agentbot/memory/`
 
-旧 JSONL 模块保留区。
-
-当前不再是主聊天路径核心。
+历史 JSONL 模块保留区。
+当前不再是主聊天链路核心。
 
 ## `ui/`
 
@@ -149,7 +185,7 @@ SQLite 主存储：
 当前文档按职责分为：
 
 - `architecture/`
-  技术结构真相
+  技术结构真相与当前边界
 - `product/`
   产品范围与路线
 - `runbooks/`
@@ -161,12 +197,11 @@ SQLite 主存储：
 - `exec-plans/`
   计划与归档
 
-## `agentbot/prompts/`
+与浏览器子图最相关的文档包括：
 
-当前提示词模块：
-
-- `system.py`
-- `browser_subgraph.py`
+- `docs/architecture/graph-flow.md`
+- `docs/architecture/runtime-flow.md`
+- `docs/architecture/browser-use-migration-todo.md`
 
 ## `workspace/`
 
@@ -174,5 +209,6 @@ SQLite 主存储：
 
 - `agent_runtime.db`
 - `langgraph_checkpoints.db`
+- `browser_artifacts/`
 
-如果文档和代码发生冲突，请以实际目录结构和当前 FastAPI/SQLite 主链路为准。
+如果文档和代码发生冲突，请以实际目录结构和当前 FastAPI / SQLite / LangGraph 主链路为准。

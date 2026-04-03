@@ -9,7 +9,7 @@ from langgraph.prebuilt import ToolNode
 
 from agentbot.graph.browser_nodes import detect_browser_intent
 from agentbot.graph.browser_subgraph import build_browser_subgraph
-from agentbot.graph.nodes import chatbot, execute_tools
+from agentbot.graph.nodes import browser_summary, chatbot, execute_tools
 from agentbot.graph.routes import route_after_chatbot, route_after_intent
 from agentbot.graph.state import MessagesState
 from agentbot.tools.infra.error_handling import format_tool_error
@@ -32,6 +32,7 @@ def build_graph(
     graph.add_node("chatbot", lambda state: chatbot(state, llm_with_tools))
     graph.add_node("tools", lambda state: execute_tools(state, tool_node))
     graph.add_node("browser_subgraph", browser_subgraph)
+    graph.add_node("browser_summary", lambda state: browser_summary(state, llm))
     graph.add_edge(START, "browser_intent")
     graph.add_conditional_edges(
         "browser_intent",
@@ -47,5 +48,6 @@ def build_graph(
         {"tools": "tools", "__end__": END},
     )
     graph.add_edge("tools", "chatbot")
-    graph.add_edge("browser_subgraph", END)
+    graph.add_edge("browser_subgraph", "browser_summary")
+    graph.add_edge("browser_summary", END)
     return graph.compile(checkpointer=checkpointer)

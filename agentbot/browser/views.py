@@ -38,9 +38,13 @@ class BrowserInteractiveElement:
     kind: Literal["link", "button", "input", "textarea", "select", "control"]
     tag: str
     selector: str
+    frame_path: list[str] = field(default_factory=list)
     text: str = ""
+    label_text: str = ""
     href: str = ""
     role: str = ""
+    ax_role: str = ""
+    ax_name: str = ""
     input_type: str = ""
     name: str = ""
     placeholder: str = ""
@@ -49,7 +53,23 @@ class BrowserInteractiveElement:
     enabled: bool = True
     visible: bool = True
     in_viewport: bool = True
+    disabled: bool = False
+    checked: bool = False
+    expanded: bool = False
+    pressed: bool = False
+    iframe_hint: str = ""
+    section_hint: str = ""
+    landmark_hint: str = ""
+    semantic_group: str = ""
+    semantic_score: float = 0.0
     bounds: BrowserElementBounds = field(default_factory=BrowserElementBounds)
+
+
+@dataclass(slots=True)
+class BrowserSemanticGroup:
+    kind: str
+    label: str
+    element_indexes: list[int] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -60,13 +80,18 @@ class BrowserStateSummary:
     page_info: BrowserPageInfo = field(default_factory=BrowserPageInfo)
     dom_summary: str = ""
     interactive_elements: list[BrowserInteractiveElement] = field(default_factory=list)
+    semantic_groups: list[BrowserSemanticGroup] = field(default_factory=list)
+    prioritized_hints: list[str] = field(default_factory=list)
     screenshot_path: str | None = None
+    observation_fingerprint: str | None = None
+    iframe_summaries: list[str] = field(default_factory=list)
+    recent_events: list[str] = field(default_factory=list)
     browser_errors: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
 class BrowserAction:
-    action_type: Literal["navigate", "click", "type", "scroll", "wait", "go_back", "switch_tab", "done"]
+    action_type: Literal["navigate", "new_tab_navigate", "click", "type", "press_enter", "scroll", "wait", "go_back", "switch_tab", "done"]
     reason: str = ""
     url: str | None = None
     element_index: int | None = None
@@ -84,3 +109,10 @@ class BrowserActionResult:
     success: bool
     summary_text: str
     output: dict | None = None
+
+
+@dataclass(slots=True)
+class BrowserActionSequenceResult:
+    results: list[BrowserActionResult] = field(default_factory=list)
+    interrupted: bool = False
+    interruption_reason: str | None = None

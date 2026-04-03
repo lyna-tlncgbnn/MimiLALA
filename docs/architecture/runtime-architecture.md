@@ -128,7 +128,7 @@ START -> chatbot -> route -> tools -> chatbot -> END
 但和早期版本不同的是：
 
 - graph 已经挂接 SQLite checkpointer
-- `conversation_id` 直接作为 LangGraph `thread_id`
+- LangGraph `thread_id` 当前按 run 隔离，并与 `run_id` 对齐
 - 同一个 conversation 的后续轮次会基于 checkpoint 恢复
 
 ### 7. Storage Layer

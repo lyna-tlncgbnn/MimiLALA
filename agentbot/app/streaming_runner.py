@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from agentbot.app.graph_runtime_events import apply_runtime_events_from_updates
 from agentbot.config.settings import Settings
 from agentbot.graph.builder import build_graph
-from agentbot.graph.checkpoints import sqlite_checkpointer, thread_config, thread_has_checkpoints
+from agentbot.graph.checkpoints import sqlite_checkpointer, thread_config
 from agentbot.models.llm import build_llm
 from agentbot.prompts.system import get_system_prompt
 from agentbot.services.sqlite_conversations import SQLiteConversationService
@@ -45,7 +45,6 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
         yield _ui_event("done")
         return
 
-    thread_id = meta.conversation_id
     user_message_id = _new_prefixed_id("msg")
     user_timestamp = _now_iso()
     user_message = HumanMessage(
@@ -62,6 +61,7 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
         yield _ui_event("run_failed", message="Failed to start run persistence.")
         yield _ui_event("done")
         return
+    thread_id = active_run.run_id
 
     yield _ui_event(
         "run_started",
@@ -80,12 +80,11 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
 
     try:
         with sqlite_checkpointer() as checkpointer:
-            seeded_from_transcript = not thread_has_checkpoints(checkpointer, thread_id)
             input_messages = _build_input_messages(
                 conversation_service=conversation_service,
                 conversation_id=meta.conversation_id,
                 user_message=user_message,
-                seed_from_transcript=seeded_from_transcript,
+                seed_from_transcript=True,
             )
             graph = build_graph(llm, checkpointer=checkpointer)
 
@@ -227,7 +226,7 @@ def _extract_delta(payload: Any) -> str | None:
     token, metadata = payload
     if not isinstance(metadata, dict):
         return None
-    if metadata.get("langgraph_node") != "chatbot":
+    if metadata.get("langgraph_node") not in {"chatbot", "browser_summary"}:
         return None
     text = _stringify_message_content(getattr(token, "content", token))
     return text if text else None

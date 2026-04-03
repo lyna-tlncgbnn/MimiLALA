@@ -8,7 +8,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from agentbot.storage.common import AGENTBOT_META_KEY
+from agentbot.storage.common import AGENTBOT_META_KEY, new_prefixed_id
 from agentbot.storage.db import AgentDatabase
 from agentbot.storage.repositories import (
     ArtifactRepository,
@@ -96,12 +96,14 @@ class RuntimeShadowWriter:
                 created_at=_conversation_created_at(meta),
                 updated_at=max(_conversation_updated_at(meta), user_timestamp),
             )
+            run_id = new_prefixed_id("run")
             run = run_repo.create(
                 conversation_id=_conversation_id(meta),
-                thread_id=_conversation_id(meta),
+                thread_id=run_id,
                 status="running",
                 workflow_name=workflow_name,
                 user_message_id=user_message_id,
+                run_id=run_id,
                 started_at=user_timestamp,
             )
             message_repo.create(

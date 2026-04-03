@@ -144,7 +144,17 @@ config.json      本地运行配置
     "api_key": "your_api_key",
     "base_url": "https://your-openai-compatible-endpoint/v1",
     "model": "gpt-4.1-mini",
-    "temperature": 0.1
+    "temperature": 0.1,
+    "max_tokens": 4096,
+    "top_p": 1.0,
+    "frequency_penalty": 0.0,
+    "presence_penalty": 0.0,
+    "request_timeout_seconds": 120,
+    "max_retries": 2,
+    "reasoning_effort": null,
+    "reasoning": null,
+    "extra_body": {},
+    "default_headers": {}
   },
   "search": {
     "provider": "tavily",
@@ -173,7 +183,9 @@ config.json      本地运行配置
     ]
   },
   "browser": {
-    "headless": true
+    "headless": true,
+    "close_on_finish": true,
+    "max_actions": 12
   },
   "debug": false
 }
@@ -185,9 +197,16 @@ config.json      本地运行配置
 - `llm.base_url` 可选，默认走 OpenAI 官方地址
 - `llm.model` 默认 `gpt-4.1-mini`
 - `llm.temperature` 必须是数字
+- `llm.max_tokens` 可选，控制最大输出长度
+- `llm.top_p` / `llm.frequency_penalty` / `llm.presence_penalty` 为常见采样参数
+- `llm.request_timeout_seconds` / `llm.max_retries` 控制请求超时与重试
+- `llm.reasoning_effort` / `llm.reasoning` 用于支持 reasoning 能力的兼容模型
+- `llm.extra_body` / `llm.default_headers` 用于 provider-specific 参数透传，例如部分 OpenAI-compatible 服务的 thinking 开关
 - `search.*` 用于应用级联网搜索配置
 - `command.*` 用于受限本地命令执行配置
 - `browser.headless` 控制浏览器子图使用后台浏览器还是可见浏览器窗口
+- `browser.close_on_finish` 控制浏览器任务结束后是否自动关闭浏览器窗口
+- `browser.max_actions` 控制浏览器子图单次运行允许的最大动作步数，默认 `12`
 - `debug` 控制控制台调试输出
 
 实现见：
