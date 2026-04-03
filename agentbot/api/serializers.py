@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from agentbot.services.conversations import message_to_api_dict
 from agentbot.services.sqlite_conversations import TranscriptMessage
-from agentbot.storage.models import ConversationRow, RunRow, RunStepRow
+from agentbot.storage.models import ArtifactRow, ConversationRow, RunRow, RunStepRow
 
 
 def serialize_sqlite_conversation(conversation: ConversationRow) -> dict:
@@ -71,4 +71,17 @@ def serialize_run_step(step: RunStepRow) -> dict:
         "input_json": step.input_json,
         "output_json": step.output_json,
         "summary_text": step.summary_text,
+    }
+
+
+def serialize_artifact(artifact: ArtifactRow) -> dict:
+    return {
+        "artifact_id": artifact.artifact_id,
+        "run_id": artifact.run_id,
+        "step_id": artifact.step_id,
+        "artifact_type": artifact.artifact_type,
+        "name": artifact.name,
+        "uri": artifact.uri,
+        "metadata_json": artifact.metadata_json,
+        "created_at": artifact.created_at,
     }

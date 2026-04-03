@@ -80,6 +80,17 @@ class RunStepPayload(BaseModel):
     summary_text: str | None = None
 
 
+class ArtifactPayload(BaseModel):
+    artifact_id: str
+    run_id: str
+    step_id: str | None = None
+    artifact_type: str
+    name: str
+    uri: str
+    metadata_json: str | None = None
+    created_at: str
+
+
 class RunDetail(BaseModel):
     run: RunSummary
 
@@ -87,6 +98,11 @@ class RunDetail(BaseModel):
 class RunStepsDetail(BaseModel):
     run: RunSummary
     steps: list[RunStepPayload]
+
+
+class RunArtifactsDetail(BaseModel):
+    run: RunSummary
+    artifacts: list[ArtifactPayload]
 
 
 class ConversationRunsDetail(BaseModel):

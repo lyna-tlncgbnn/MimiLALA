@@ -67,6 +67,22 @@ const runStepsDetailSchema = z.object({
   steps: z.array(runStepSchema),
 });
 
+const artifactSchema = z.object({
+  artifact_id: z.string(),
+  run_id: z.string(),
+  step_id: z.string().nullable().optional(),
+  artifact_type: z.string(),
+  name: z.string(),
+  uri: z.string(),
+  metadata_json: z.string().nullable().optional(),
+  created_at: z.string(),
+});
+
+const runArtifactsDetailSchema = z.object({
+  run: runSummarySchema,
+  artifacts: z.array(artifactSchema),
+});
+
 const sendMessageResponseSchema = z.object({
   conversation: conversationSummarySchema,
   messages: z.array(messageSchema),
@@ -87,6 +103,8 @@ export type RunSummary = z.infer<typeof runSummarySchema>;
 export type ConversationRunsDetail = z.infer<typeof conversationRunsDetailSchema>;
 export type RunStep = z.infer<typeof runStepSchema>;
 export type RunStepsDetail = z.infer<typeof runStepsDetailSchema>;
+export type Artifact = z.infer<typeof artifactSchema>;
+export type RunArtifactsDetail = z.infer<typeof runArtifactsDetailSchema>;
 export type ToolCallPayload = NonNullable<ChatMessage["tool_calls"]>[number];
 export type ChatStreamEvent =
   | {
@@ -274,6 +292,14 @@ export async function getRunSteps(runId: string) {
     `/api/runs/${runId}/steps`,
     { method: "GET" },
     runStepsDetailSchema,
+  );
+}
+
+export async function getRunArtifacts(runId: string) {
+  return request(
+    `/api/runs/${runId}/artifacts`,
+    { method: "GET" },
+    runArtifactsDetailSchema,
   );
 }
 

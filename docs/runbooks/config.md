@@ -40,6 +40,9 @@
       "&&"
     ]
   },
+  "browser": {
+    "headless": true
+  },
   "debug": false
 }
 ```
@@ -58,6 +61,7 @@
 - `llm.*`
 - `search.*`
 - `command.*`
+- `browser.*`
 - 以后可能的 provider 选择、默认超时、默认参数、功能开关
 
 ### 不放在 `config.json` 的
@@ -100,6 +104,8 @@
   允许执行的程序白名单
 - `command.blocked_patterns`
   明确禁止出现在命令字符串中的危险模式
+- `browser.headless`
+  是否以后台模式运行浏览器子图。`true` 表示后台执行，`false` 表示弹出可见浏览器窗口
 - `debug`
   布尔型
 
@@ -115,4 +121,5 @@
 - 如果接第三方兼容服务，再设置 `base_url`
 - 如需联网搜索，补充 `search` 段
 - 如需受限本地命令执行，补充并调整 `command` 段
+- 如需可见浏览器窗口，把 `browser.headless` 改成 `false`
 - 排障时可临时把 `debug` 设为 `true`

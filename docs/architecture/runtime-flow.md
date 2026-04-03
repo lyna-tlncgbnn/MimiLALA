@@ -20,7 +20,7 @@ CLI / POST /runs
   -> ChatService.send_run_to_conversation()
     -> run_once(...)
       -> build_graph(...)
-      -> graph.invoke(...)
+      -> graph.stream(...)
       -> tools / LLM / checkpoints
       -> persist transcript / run / steps
     -> read back conversation + latest run
@@ -98,14 +98,43 @@ React UI
 
 ## LangGraph 执行阶段
 
-当前 graph 仍是标准 chatbot/tool loop：
+当前 graph 仍以 chatbot/tool loop 为主，但已经开始接入 specialist subgraph：
 
 1. runner 构建输入
-2. graph 中 `chatbot` 节点调用已绑定 tools 的 LLM
-3. route 判断是否转入 `tools`
-4. `ToolNode` 执行
-5. 工具结果送回 `chatbot`
-6. 当模型不再发出 tool call 时结束
+2. graph 先经过 intent 判断节点
+3. 如果识别为浏览器任务，则进入 `browser_subgraph`
+4. 否则进入 `chatbot` 节点调用已绑定 tools 的 LLM
+5. route 判断是否转入 `tools`
+6. `ToolNode` 执行
+7. 工具结果送回 `chatbot`
+8. 当模型不再发出 tool call 时结束
+
+当前 `browser_subgraph` 已经完成最小真实浏览器交互闭环，当前主要支持：
+
+- Playwright 驱动 Chromium 会话
+- 真实页面导航与读取
+- 页面标题、主文本、链接、表单控件摘要
+- 页面截图输出到 `workspace/browser_artifacts/`
+- 子图内部 `observe -> decide -> act -> evaluate -> observe/finish` 循环
+- 基础交互动作：`click / type / scroll / wait / go_back / switch_tab`
+- browser 执行步骤实时写入 `run_steps`
+- browser screenshot / page summary artifacts 落入统一 `artifacts`
+- 轻量 loop detection 提示重复动作与页面停滞
+- 敏感动作会先收口为 `approval_required`，为后续 approval / interrupt UI 预留边界
+
+它当前仍然不是完整 browser automation framework，现阶段主要用于打通：
+
+- 子图接入主图
+- browser 执行步骤落库
+- execution timeline 可见性
+- 真实页面读取能力
+
+后续阶段再继续补真实交互动作。
+
+当前 run 相关 API 还额外支持：
+
+- `GET /api/runs/{run_id}/steps`
+- `GET /api/runs/{run_id}/artifacts`
 
 和早期阶段不同的是，当前执行会附带：
 

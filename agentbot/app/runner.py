@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
+from agentbot.app.graph_runtime_events import apply_runtime_events_from_updates
 from agentbot.app.debug import DebugPrinter
 from agentbot.config.settings import Settings
 from agentbot.graph.builder import build_graph
@@ -78,10 +79,25 @@ def run_once(user_text: str, conversation_id: str | None = None) -> str:
                 "loaded conversation state: "
                 f"{'transcript seed' if seeded_from_transcript else 'checkpoint resume'}"
             )
-            result = graph.invoke(
+            emitted_tool_calls: set[str] = set()
+            final_values: dict | None = None
+            for chunk in graph.stream(
                 {"messages": input_messages},
                 config=thread_config(thread_id),
-            )
+                stream_mode=["updates", "values"],
+                version="v2",
+            ):
+                event_type, payload = _normalize_stream_chunk(chunk)
+                if event_type == "updates" and active_run is not None:
+                    active_run, _runtime_events = apply_runtime_events_from_updates(
+                        payload,
+                        active_run,
+                        runtime_writer,
+                        emitted_tool_calls,
+                    )
+                elif event_type == "values" and isinstance(payload, dict):
+                    final_values = payload
+            result = final_values or {}
     except Exception as exc:
         if active_run is not None:
             _best_effort(
@@ -95,14 +111,12 @@ def run_once(user_text: str, conversation_id: str | None = None) -> str:
         raise AgentBotError(_format_graph_error(exc)) from exc
 
     final_messages = result["messages"]
-    new_messages = _messages_for_current_run(final_messages, user_message_id)
     if active_run is not None:
         _best_effort(
             lambda: _persist_run_outcome(
                 runtime_writer=runtime_writer,
                 active_run=active_run,
                 meta=meta,
-                new_messages=new_messages,
                 final_messages=final_messages,
             )
         )
@@ -162,40 +176,23 @@ def _format_graph_error(exc: Exception) -> str:
     return f"Graph execution failed: {message}"
 
 
+def _normalize_stream_chunk(chunk):
+    if isinstance(chunk, tuple) and len(chunk) == 2 and isinstance(chunk[0], str):
+        return chunk[0], chunk[1]
+    if isinstance(chunk, dict):
+        event_type = chunk.get("type")
+        if isinstance(event_type, str):
+            return event_type, chunk.get("data")
+    return None, None
+
+
 def _persist_run_outcome(
     *,
     runtime_writer: RuntimeShadowWriter,
     active_run: ActiveRunShadow,
     meta,
-    new_messages: list,
     final_messages: list,
 ) -> None:
-    for message in new_messages:
-        if isinstance(message, AIMessage) and message.tool_calls:
-            metadata = _message_metadata(message)
-            for tool_call in message.tool_calls:
-                tool_call_id = str(tool_call.get("id") or "")
-                if not tool_call_id:
-                    continue
-                runtime_writer.record_tool_started(
-                    active_run,
-                    tool_call_id=tool_call_id,
-                    tool_name=str(tool_call.get("name") or "unknown_tool"),
-                    args=tool_call.get("args") or {},
-                    timestamp=metadata["timestamp"],
-                )
-        elif isinstance(message, ToolMessage):
-            metadata = _message_metadata(message)
-            content = _stringify_message_content(message.content)
-            runtime_writer.record_tool_finished(
-                active_run,
-                tool_call_id=str(message.tool_call_id or ""),
-                tool_name=message.name or "unknown_tool",
-                tool_output=content,
-                timestamp=metadata["timestamp"],
-                failed=is_tool_error_output(content),
-            )
-
     final_assistant = _find_final_assistant_message(final_messages)
     if final_assistant is None:
         runtime_writer.fail_run(

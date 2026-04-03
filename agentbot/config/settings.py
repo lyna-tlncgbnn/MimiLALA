@@ -15,6 +15,7 @@ DEFAULT_COMMAND_ENABLED = False
 DEFAULT_COMMAND_DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_COMMAND_MAX_TIMEOUT_SECONDS = 60.0
 DEFAULT_COMMAND_MAX_OUTPUT_CHARS = 12000
+DEFAULT_BROWSER_HEADLESS = True
 DEFAULT_ALLOWED_COMMAND_PROGRAMS = (
     ".venv\\Scripts\\python.exe",
     "python",
@@ -63,6 +64,13 @@ class CommandSettings:
 
 
 @dataclass(slots=True)
+class BrowserSettings:
+    """Application-level browser execution settings loaded from config.json."""
+
+    headless: bool = DEFAULT_BROWSER_HEADLESS
+
+
+@dataclass(slots=True)
 class Settings:
     """Runtime settings loaded from the project config file."""
 
@@ -72,6 +80,7 @@ class Settings:
     temperature: float = DEFAULT_TEMPERATURE
     search: SearchSettings | None = None
     command: CommandSettings | None = None
+    browser: BrowserSettings | None = None
     debug: bool = False
 
     @classmethod
@@ -106,6 +115,7 @@ class Settings:
 
         search = _parse_search_settings(payload.get("search"))
         command = _parse_command_settings(payload.get("command"))
+        browser = _parse_browser_settings(payload.get("browser"))
 
         debug_raw = payload.get("debug", False)
         if not isinstance(debug_raw, bool):
@@ -118,6 +128,7 @@ class Settings:
             temperature=temperature,
             search=search,
             command=command,
+            browser=browser,
             debug=debug_raw,
         )
 
@@ -232,6 +243,19 @@ def _parse_command_settings(raw_payload) -> CommandSettings | None:
         allowed_programs=allowed_programs,
         blocked_patterns=blocked_patterns,
     )
+
+
+def _parse_browser_settings(raw_payload) -> BrowserSettings | None:
+    if raw_payload is None:
+        return BrowserSettings()
+    if not isinstance(raw_payload, dict):
+        raise ValueError(f"{CONFIG_FILE_NAME} browser must be an object when provided.")
+
+    headless_raw = raw_payload.get("headless", DEFAULT_BROWSER_HEADLESS)
+    if not isinstance(headless_raw, bool):
+        raise ValueError(f"{CONFIG_FILE_NAME} browser.headless must be true or false.")
+
+    return BrowserSettings(headless=headless_raw)
 
 
 def _parse_string_list(raw_value, *, field_name: str, min_length: int) -> list[str]:

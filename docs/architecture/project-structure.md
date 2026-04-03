@@ -57,11 +57,24 @@ FastAPI 接口层：
 
 - `settings.py`
 
+### `agentbot/browser/`
+
+浏览器子图支撑层：
+
+- `actions.py`
+- `session.py`
+- `dom_service.py`
+- `loop_detection.py`
+- `views.py`
+
 ### `agentbot/graph/`
 
 LangGraph 构建和 checkpoint 接入：
 
 - `builder.py`
+- `browser_nodes.py`
+- `browser_routes.py`
+- `browser_subgraph.py`
 - `checkpoints.py`
 - `nodes.py`
 - `routes.py`
@@ -147,6 +160,13 @@ SQLite 主存储：
   已完成实现说明
 - `exec-plans/`
   计划与归档
+
+## `agentbot/prompts/`
+
+当前提示词模块：
+
+- `system.py`
+- `browser_subgraph.py`
 
 ## `workspace/`
 

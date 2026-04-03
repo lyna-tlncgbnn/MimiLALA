@@ -25,6 +25,7 @@ class ActiveRunShadow:
     conversation_id: str
     user_message_id: str
     tool_steps: dict[str, str]
+    named_steps: dict[str, str]
     next_sort_order: int
 
 
@@ -119,8 +120,106 @@ class RuntimeShadowWriter:
                 conversation_id=meta.conversation_id,
                 user_message_id=user_message_id,
                 tool_steps={},
+                named_steps={},
                 next_sort_order=1,
             )
+
+    def record_step_started(
+        self,
+        active_run: ActiveRunShadow,
+        *,
+        step_key: str,
+        step_type: str,
+        title: str,
+        timestamp: str,
+        display_mode: str = "timeline",
+        parent_step_key: str | None = None,
+        summary_text: str | None = None,
+        input_payload: Any = None,
+        tool_name: str | None = None,
+        tool_call_id: str | None = None,
+    ) -> ActiveRunShadow:
+        parent_step_id = None
+        if parent_step_key:
+            parent_step_id = (
+                active_run.named_steps.get(parent_step_key)
+                or active_run.tool_steps.get(parent_step_key)
+            )
+
+        self.database.initialize()
+        with self.database.connect() as connection:
+            step_repo = RunStepRepository(connection)
+            step = step_repo.create(
+                run_id=active_run.run_id,
+                step_type=step_type,
+                title=title,
+                status="running",
+                display_mode=display_mode,
+                sort_order=active_run.next_sort_order,
+                parent_step_id=parent_step_id,
+                tool_name=tool_name,
+                tool_call_id=tool_call_id,
+                input_payload=input_payload,
+                summary_text=summary_text,
+                started_at=timestamp,
+            )
+
+        active_run.named_steps[step_key] = step.step_id
+        active_run.next_sort_order += 1
+        return active_run
+
+    def record_step_finished(
+        self,
+        active_run: ActiveRunShadow,
+        *,
+        step_key: str,
+        timestamp: str,
+        status: str = "completed",
+        output_payload: Any = None,
+        summary_text: str | None = None,
+    ) -> ActiveRunShadow:
+        step_id = active_run.named_steps.get(step_key) or active_run.tool_steps.get(step_key)
+        if step_id is None:
+            return active_run
+
+        self.database.initialize()
+        with self.database.connect() as connection:
+            step_repo = RunStepRepository(connection)
+            step_repo.update_status(
+                step_id,
+                status=status,
+                output_payload=output_payload,
+                summary_text=summary_text,
+                ended_at=timestamp,
+            )
+        return active_run
+
+    def record_artifact(
+        self,
+        active_run: ActiveRunShadow,
+        *,
+        artifact_type: str,
+        name: str,
+        uri: str,
+        step_key: str | None = None,
+        metadata: Any = None,
+    ) -> str:
+        step_id = None
+        if step_key:
+            step_id = active_run.named_steps.get(step_key) or active_run.tool_steps.get(step_key)
+
+        self.database.initialize()
+        with self.database.connect() as connection:
+            artifact_repo = ArtifactRepository(connection)
+            artifact = artifact_repo.create(
+                run_id=active_run.run_id,
+                step_id=step_id,
+                artifact_type=artifact_type,
+                name=name,
+                uri=uri,
+                metadata=metadata,
+            )
+        return artifact.artifact_id
 
     def record_tool_started(
         self,

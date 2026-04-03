@@ -172,6 +172,9 @@ config.json      本地运行配置
       "&&"
     ]
   },
+  "browser": {
+    "headless": true
+  },
   "debug": false
 }
 ```
@@ -184,6 +187,7 @@ config.json      本地运行配置
 - `llm.temperature` 必须是数字
 - `search.*` 用于应用级联网搜索配置
 - `command.*` 用于受限本地命令执行配置
+- `browser.headless` 控制浏览器子图使用后台浏览器还是可见浏览器窗口
 - `debug` 控制控制台调试输出
 
 实现见：

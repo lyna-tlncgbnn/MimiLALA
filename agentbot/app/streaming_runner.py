@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 
+from agentbot.app.graph_runtime_events import apply_runtime_events_from_updates
 from agentbot.config.settings import Settings
 from agentbot.graph.builder import build_graph
 from agentbot.graph.checkpoints import sqlite_checkpointer, thread_config, thread_has_checkpoints
@@ -16,7 +17,6 @@ from agentbot.prompts.system import get_system_prompt
 from agentbot.services.sqlite_conversations import SQLiteConversationService
 from agentbot.storage.common import AGENTBOT_META_KEY
 from agentbot.storage.shadow_runtime import ActiveRunShadow, RuntimeShadowWriter
-from agentbot.tools.infra.error_handling import is_tool_error_output
 
 
 def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]]:
@@ -117,7 +117,13 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
                     continue
 
                 if event_type == "updates":
-                    for event in _step_events_from_updates(payload, active_run, runtime_writer, emitted_tool_calls):
+                    active_run, runtime_events = apply_runtime_events_from_updates(
+                        payload,
+                        active_run,
+                        runtime_writer,
+                        emitted_tool_calls,
+                    )
+                    for event in runtime_events:
                         yield event
                     continue
 
@@ -188,83 +194,6 @@ def stream_once(user_text: str, conversation_id: str) -> Iterator[dict[str, Any]
         ended_at=assistant_metadata["timestamp"],
     )
     yield _ui_event("done")
-
-
-def _step_events_from_updates(
-    payload: Any,
-    active_run: ActiveRunShadow,
-    runtime_writer: RuntimeShadowWriter,
-    emitted_tool_calls: set[str],
-) -> Iterator[dict[str, Any]]:
-    if not isinstance(payload, dict):
-        return
-
-    for node_update in payload.values():
-        if not isinstance(node_update, dict):
-            continue
-
-        messages = node_update.get("messages")
-        if messages is None:
-            continue
-        if not isinstance(messages, list):
-            messages = [messages]
-
-        for message in messages:
-            if isinstance(message, AIMessage) and message.tool_calls:
-                metadata = _message_metadata(message)
-                for tool_call in message.tool_calls:
-                    tool_call_id = str(tool_call.get("id") or _new_prefixed_id("call"))
-                    if tool_call_id in emitted_tool_calls:
-                        continue
-                    emitted_tool_calls.add(tool_call_id)
-                    active_run = runtime_writer.record_tool_started(
-                        active_run,
-                        tool_call_id=tool_call_id,
-                        tool_name=str(tool_call.get("name") or "unknown_tool"),
-                        args=tool_call.get("args") or {},
-                        timestamp=metadata["timestamp"],
-                    )
-                    step_id = active_run.tool_steps.get(tool_call_id)
-                    yield _ui_event(
-                        "step_started",
-                        run_id=active_run.run_id,
-                        step_id=step_id,
-                        step_type="tool_call",
-                        title=f"Running {str(tool_call.get('name') or 'unknown_tool')}",
-                        status="running",
-                        display_mode="timeline",
-                        tool_name=str(tool_call.get("name") or "unknown_tool"),
-                        tool_call_id=tool_call_id,
-                        args=tool_call.get("args") or {},
-                        timestamp=metadata["timestamp"],
-                    )
-            elif isinstance(message, ToolMessage):
-                metadata = _message_metadata(message)
-                tool_output = _stringify_message_content(message.content)
-                failed = is_tool_error_output(tool_output)
-                active_run = runtime_writer.record_tool_finished(
-                    active_run,
-                    tool_call_id=str(message.tool_call_id or ""),
-                    tool_name=message.name or "unknown_tool",
-                    tool_output=tool_output,
-                    timestamp=metadata["timestamp"],
-                    failed=failed,
-                )
-                step_id = active_run.tool_steps.get(str(message.tool_call_id or ""))
-                yield _ui_event(
-                    "step_completed",
-                    run_id=active_run.run_id,
-                    step_id=step_id,
-                    step_type="tool_call",
-                    title=f"Running {message.name or 'unknown_tool'}",
-                    status="failed" if failed else "completed",
-                    tool_name=message.name or "unknown_tool",
-                    tool_call_id=str(message.tool_call_id or ""),
-                    output=tool_output,
-                    timestamp=metadata["timestamp"],
-                )
-
-
 def _build_input_messages(
     *,
     conversation_service: SQLiteConversationService,
