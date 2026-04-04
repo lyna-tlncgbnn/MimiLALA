@@ -14,51 +14,62 @@ from agentbot.api.schemas import (
     CreateConversationRequest,
     MessagePayload,
     RenameConversationRequest,
-    RunSummary,
     SendRunResponse,
     SendMessageRequest,
     SendMessageResponse,
 )
 from agentbot.api.serializers import (
     serialize_run,
-    serialize_messages,
     serialize_sqlite_conversation,
     serialize_transcript_messages,
 )
-from agentbot.services.chat import ChatService
-from agentbot.services.conversations import ConversationService
-from agentbot.storage.db import AgentDatabase
-from agentbot.storage.repositories import RunRepository
+from agentbot.services.conversation_commands import ConversationCommands
+from agentbot.services.conversation_queries import ConversationQueries
+from agentbot.services.run_execution import RunExecution
+from agentbot.services.run_queries import RunQueries
+from agentbot.services.run_streaming import RunStreaming
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 
 
-def _conversation_service() -> ConversationService:
-    return ConversationService()
+def _conversation_queries() -> ConversationQueries:
+    return ConversationQueries()
 
 
-def _chat_service() -> ChatService:
-    return ChatService()
+def _conversation_commands() -> ConversationCommands:
+    return ConversationCommands()
+
+
+def _run_queries() -> RunQueries:
+    return RunQueries()
+
+
+def _run_execution() -> RunExecution:
+    return RunExecution()
+
+
+def _run_streaming() -> RunStreaming:
+    return RunStreaming()
 
 
 @router.get("", response_model=list[ConversationSummary])
 def list_conversations():
-    service = _conversation_service()
-    return [serialize_sqlite_conversation(meta) for meta in service.list_conversations()]
+    queries = _conversation_queries()
+    return [serialize_sqlite_conversation(meta) for meta in queries.list_conversations()]
 
 
 @router.post("", response_model=ConversationSummary, status_code=status.HTTP_201_CREATED)
 def create_conversation(request: CreateConversationRequest):
-    service = _conversation_service()
-    meta = service.create_conversation(request.name)
+    commands = _conversation_commands()
+    meta = commands.create_conversation(request.name)
     return serialize_sqlite_conversation(meta)
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetail)
 def get_conversation(conversation_id: str):
-    service = _conversation_service()
+    queries = _conversation_queries()
     try:
-        meta, messages = service.get_conversation(conversation_id)
+        meta, messages = queries.get_conversation(conversation_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {
@@ -69,9 +80,9 @@ def get_conversation(conversation_id: str):
 
 @router.get("/{conversation_id}/messages", response_model=list[MessagePayload])
 def get_conversation_messages(conversation_id: str):
-    service = _conversation_service()
+    queries = _conversation_queries()
     try:
-        _meta, messages = service.get_conversation(conversation_id)
+        _meta, messages = queries.get_conversation(conversation_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return serialize_transcript_messages(messages)
@@ -79,28 +90,24 @@ def get_conversation_messages(conversation_id: str):
 
 @router.get("/{conversation_id}/runs", response_model=ConversationRunsDetail)
 def list_conversation_runs(conversation_id: str):
-    service = _conversation_service()
+    queries = _conversation_queries()
+    run_queries = _run_queries()
     try:
-        meta, _messages = service.get_conversation(conversation_id)
+        meta, _messages = queries.get_conversation(conversation_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    database = AgentDatabase()
-    database.initialize()
-    with database.connect() as connection:
-        runs = RunRepository(connection).list_for_conversation(conversation_id)
-
     return {
         "conversation": serialize_sqlite_conversation(meta),
-        "runs": [serialize_run(run) for run in runs],
+        "runs": [serialize_run(run) for run in run_queries.list_for_conversation(conversation_id)],
     }
 
 
 @router.patch("/{conversation_id}", response_model=ConversationSummary)
 def rename_conversation(conversation_id: str, request: RenameConversationRequest):
-    service = _conversation_service()
+    commands = _conversation_commands()
     try:
-        meta = service.rename_conversation(conversation_id, request.name)
+        meta = commands.rename_conversation(conversation_id, request.name)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return serialize_sqlite_conversation(meta)
@@ -108,9 +115,9 @@ def rename_conversation(conversation_id: str, request: RenameConversationRequest
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_conversation(conversation_id: str):
-    service = _conversation_service()
+    commands = _conversation_commands()
     try:
-        service.delete_conversation(conversation_id)
+        commands.delete_conversation(conversation_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return None
@@ -118,9 +125,9 @@ def delete_conversation(conversation_id: str):
 
 @router.post("/{conversation_id}/messages", response_model=SendMessageResponse)
 def send_message_to_conversation(conversation_id: str, request: SendMessageRequest):
-    chat_service = _chat_service()
+    execution = _run_execution()
     try:
-        meta, messages, reply = chat_service.send_message_to_conversation(
+        meta, messages, reply = execution.send_message_to_conversation(
             conversation_id,
             request.content,
         )
@@ -147,9 +154,9 @@ def send_message_to_conversation(conversation_id: str, request: SendMessageReque
 
 @router.post("/{conversation_id}/runs", response_model=SendRunResponse)
 def send_run_to_conversation(conversation_id: str, request: SendMessageRequest):
-    chat_service = _chat_service()
+    execution = _run_execution()
     try:
-        meta, run, messages, reply = chat_service.send_run_to_conversation(
+        meta, run, messages, reply = execution.send_run_to_conversation(
             conversation_id,
             request.content,
         )
@@ -177,11 +184,11 @@ def send_run_to_conversation(conversation_id: str, request: SendMessageRequest):
 
 
 def _run_stream_response(conversation_id: str, request: SendMessageRequest):
-    chat_service = _chat_service()
+    streaming = _run_streaming()
 
     def event_stream():
         try:
-            for event in chat_service.stream_message_to_conversation(conversation_id, request.content):
+            for event in streaming.stream_run_for_conversation(conversation_id, request.content):
                 payload = json.dumps(event.get("data", {}), ensure_ascii=False)
                 yield f"event: {event['event']}\n".encode("utf-8")
                 yield f"data: {payload}\n\n".encode("utf-8")

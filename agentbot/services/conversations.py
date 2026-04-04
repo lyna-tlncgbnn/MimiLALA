@@ -1,38 +1,41 @@
-"""Conversation-oriented service helpers."""
+"""Compatibility helpers for conversation use cases and API serialization."""
 
 from __future__ import annotations
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 
-from agentbot.services.sqlite_conversations import SQLiteConversationService
+from agentbot.services.conversation_commands import ConversationCommands
+from agentbot.services.conversation_queries import ConversationQueries
 
 
 class ConversationService:
-    """Primary SQLite-backed conversation operations for API consumers."""
+    """Backward-compatible facade over explicit conversation use cases."""
 
     def __init__(
         self,
-        sqlite_service: SQLiteConversationService | None = None,
+        queries: ConversationQueries | None = None,
+        commands: ConversationCommands | None = None,
     ):
-        self.sqlite_service = sqlite_service or SQLiteConversationService()
+        self.queries = queries or ConversationQueries()
+        self.commands = commands or ConversationCommands()
 
     def list_conversations(self):
-        return self.sqlite_service.list_conversations()
+        return self.queries.list_conversations()
 
     def create_conversation(self, name: str | None = None):
-        return self.sqlite_service.create_conversation(name)
+        return self.commands.create_conversation(name)
 
     def get_conversation(self, conversation_id: str):
-        return self.sqlite_service.get_conversation(conversation_id)
+        return self.queries.get_conversation(conversation_id)
 
     def rename_conversation(self, conversation_id: str, new_name: str):
-        return self.sqlite_service.rename_conversation(conversation_id, new_name)
+        return self.commands.rename_conversation(conversation_id, new_name)
 
     def delete_conversation(self, conversation_id: str) -> None:
-        self.sqlite_service.delete_conversation(conversation_id)
+        self.commands.delete_conversation(conversation_id)
 
     def get_default_conversation(self):
-        return self.sqlite_service.get_default_conversation()
+        return self.queries.get_default_conversation()
 
 
 def message_to_api_dict(message: BaseMessage) -> dict:

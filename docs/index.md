@@ -30,7 +30,17 @@
 
 - [exec-detail](/F:/AgentBot/docs/exec-detail)
 
+当前进行中的结构方案：
+
+- [2026-04-04-backend-reorganization-blueprint.md](/F:/AgentBot/docs/exec-plans/active/2026-04-04-backend-reorganization-blueprint.md)
+
 本阶段与浏览器 runtime V2 相关的记录：
 
 - [2026-04-04-browser-runtime-v2-phase1-watchdogs.md](/F:/AgentBot/docs/exec-detail/2026-04-04-browser-runtime-v2-phase1-watchdogs.md)
 - [2026-04-04-browser-runtime-v2-phase3-dom-watchdog.md](/F:/AgentBot/docs/exec-detail/2026-04-04-browser-runtime-v2-phase3-dom-watchdog.md)
+
+当前重构过程中与 browser 子系统边界评估相关的记录：
+
+- [2026-04-04-browser-subsystem-reassessment.md](/F:/AgentBot/docs/exec-detail/2026-04-04-browser-subsystem-reassessment.md)
+- [2026-04-04-backend-reorganization-phase4a-browser-adapter-split.md](/F:/AgentBot/docs/exec-detail/2026-04-04-backend-reorganization-phase4a-browser-adapter-split.md)
+- [2026-04-04-backend-reorganization-phase4b-session-manager.md](/F:/AgentBot/docs/exec-detail/2026-04-04-backend-reorganization-phase4b-session-manager.md)

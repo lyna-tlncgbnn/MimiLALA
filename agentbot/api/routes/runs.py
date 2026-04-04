@@ -6,57 +6,46 @@ from fastapi import APIRouter, HTTPException
 
 from agentbot.api.schemas import RunArtifactsDetail, RunDetail, RunStepsDetail
 from agentbot.api.serializers import serialize_artifact, serialize_run, serialize_run_step
-from agentbot.storage.db import AgentDatabase
-from agentbot.storage.repositories import ArtifactRepository, RunRepository, RunStepRepository
+from agentbot.services.run_queries import RunQueries
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 
+def _run_queries() -> RunQueries:
+    return RunQueries()
+
+
 @router.get("/{run_id}", response_model=RunDetail)
 def get_run(run_id: str):
-    database = AgentDatabase()
-    database.initialize()
-    with database.connect() as connection:
-        run_repo = RunRepository(connection)
-        run = run_repo.get(run_id)
-        if run is None:
-            raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
-        return {"run": serialize_run(run)}
+    queries = _run_queries()
+    try:
+        run = queries.get_run(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"run": serialize_run(run)}
 
 
 @router.get("/{run_id}/steps", response_model=RunStepsDetail)
 def get_run_steps(run_id: str):
-    database = AgentDatabase()
-    database.initialize()
-    with database.connect() as connection:
-        run_repo = RunRepository(connection)
-        step_repo = RunStepRepository(connection)
-
-        run = run_repo.get(run_id)
-        if run is None:
-            raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
-
-        steps = step_repo.list_for_run(run_id)
-        return {
-            "run": serialize_run(run),
-            "steps": [serialize_run_step(step) for step in steps],
-        }
+    queries = _run_queries()
+    try:
+        result = queries.get_run_steps(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "run": serialize_run(result.run),
+        "steps": [serialize_run_step(step) for step in result.steps],
+    }
 
 
 @router.get("/{run_id}/artifacts", response_model=RunArtifactsDetail)
 def get_run_artifacts(run_id: str):
-    database = AgentDatabase()
-    database.initialize()
-    with database.connect() as connection:
-        run_repo = RunRepository(connection)
-        artifact_repo = ArtifactRepository(connection)
-
-        run = run_repo.get(run_id)
-        if run is None:
-            raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
-
-        artifacts = artifact_repo.list_for_run(run_id)
-        return {
-            "run": serialize_run(run),
-            "artifacts": [serialize_artifact(artifact) for artifact in artifacts],
-        }
+    queries = _run_queries()
+    try:
+        result = queries.get_run_artifacts(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "run": serialize_run(result.run),
+        "artifacts": [serialize_artifact(artifact) for artifact in result.artifacts],
+    }

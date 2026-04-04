@@ -1,1 +1,1 @@
-"""Service layer for API and CLI reuse."""
+"""Use-case-oriented service layer for API and CLI reuse."""

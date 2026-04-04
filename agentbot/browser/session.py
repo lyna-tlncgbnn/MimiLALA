@@ -17,6 +17,15 @@ from uuid import uuid4
 
 from playwright.sync_api import Browser, BrowserContext, Download, Dialog, Page, Playwright, sync_playwright
 
+from agentbot.browser.session_manager import (
+    browser_download_dir,
+    browser_session_artifacts_dir,
+    cleanup_orphan_browser_profiles,
+    close_runtime_session,
+    discard_runtime_session,
+    get_runtime_session,
+    register_runtime_session,
+)
 from agentbot.browser.runtime import (
     BrowserClosedEvent,
     BrowserStateRequestEvent,
@@ -100,52 +109,6 @@ class BrowserRuntimeSession:
     download_complete_timeout_seconds: float = 30.0
 
 
-_SESSION_REGISTRY: dict[str, BrowserRuntimeSession] = {}
-
-
-def browser_output_dir(base_dir: Path | None = None) -> Path:
-    path = base_dir or (workspace_root() / "browser_artifacts")
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def browser_profiles_dir(base_dir: Path | None = None) -> Path:
-    path = base_dir or (workspace_root() / "browser_profiles")
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _cleanup_orphan_browser_profiles(temp_profiles_dir: str | None) -> None:
-    profiles_root = _resolve_optional_dir(temp_profiles_dir, default=workspace_root() / "browser_profiles")
-    active_dirs = {
-        runtime.temp_profile_dir.resolve()
-        for runtime in _SESSION_REGISTRY.values()
-        if runtime.temp_profile_dir is not None
-    }
-    for entry in profiles_root.iterdir():
-        if not entry.is_dir() or not entry.name.startswith("browser_session_"):
-            continue
-        try:
-            resolved = entry.resolve()
-        except OSError:
-            resolved = entry
-        if resolved in active_dirs:
-            continue
-        shutil.rmtree(entry, ignore_errors=True)
-
-
-def browser_session_artifacts_dir(session_id: str, *, base_dir: Path | None = None) -> Path:
-    path = browser_output_dir(base_dir) / session_id
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def browser_download_dir(session_id: str, *, base_dir: Path | None = None) -> Path:
-    path = browser_session_artifacts_dir(session_id, base_dir=base_dir) / "downloads"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 def start_browser_session(
     *,
     initial_url: str,
@@ -170,7 +133,10 @@ def start_browser_session(
     download_complete_timeout_seconds: float = 30.0,
 ) -> BrowserSessionState:
     if mode == "system":
-        _cleanup_orphan_browser_profiles(temp_profiles_dir)
+        cleanup_orphan_browser_profiles(
+            temp_profiles_dir,
+            resolve_optional_dir=_resolve_optional_dir,
+        )
     session_id = f"browser_session_{uuid4().hex}"
     runtime = _create_runtime_session(
         session_id=session_id,
@@ -194,7 +160,7 @@ def start_browser_session(
         download_start_timeout_seconds=download_start_timeout_seconds,
         download_complete_timeout_seconds=download_complete_timeout_seconds,
     )
-    _SESSION_REGISTRY[session_id] = runtime
+    register_runtime_session(session_id, runtime)
     page_title = runtime.page.title() or title
     return BrowserSessionState(
         session_id=session_id,
@@ -217,14 +183,6 @@ def start_browser_session(
         artifacts_dir=str(runtime.artifacts_dir),
         downloads_dir=str(runtime.downloads_dir),
     )
-
-
-def get_runtime_session(session_id: str) -> BrowserRuntimeSession:
-    runtime = _SESSION_REGISTRY.get(session_id)
-    if runtime is None:
-        raise ValueError(f"Browser session not found: {session_id}")
-    return runtime
-
 
 def dispatch_runtime_action(runtime: BrowserRuntimeSession, event) -> Any:
     if runtime.event_bus is None:
@@ -253,34 +211,10 @@ def request_browser_state(
 
 
 def close_browser_session(session_id: str) -> None:
-    runtime = _SESSION_REGISTRY.pop(session_id, None)
+    runtime = discard_runtime_session(session_id)
     if runtime is None:
         return
-
-    if runtime.event_bus is not None:
-        runtime.event_bus.emit(BrowserClosedEvent(created_at=time.time(), reason="close_browser_session"))
-
-    try:
-        runtime.context.close()
-    except Exception:
-        pass
-
-    if runtime.browser is not None:
-        try:
-            runtime.browser.close()
-        except Exception:
-            pass
-
-    if runtime.browser_process is not None:
-        _terminate_process(runtime.browser_process)
-
-    try:
-        runtime.playwright.stop()
-    except Exception:
-        pass
-
-    if runtime.temp_profile_dir and runtime.temp_profile_dir.exists():
-        shutil.rmtree(runtime.temp_profile_dir, ignore_errors=True)
+    close_runtime_session(runtime, terminate_process=_terminate_process)
 
 
 def _create_runtime_session(
