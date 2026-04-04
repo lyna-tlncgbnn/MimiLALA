@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import App from "@/app/App";
 import "@/app/styles.css";
+import "@/features/chat/renderers/markdown-theme.css";
+import "katex/dist/katex.min.css";
 
 const queryClient = new QueryClient();
 

@@ -1,0 +1,225 @@
+.agent-markdown {
+  color: inherit;
+  font-size: 15px;
+  line-height: 1.82;
+}
+
+.agent-markdown > :first-child {
+  margin-top: 0;
+}
+
+.agent-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.agent-markdown p,
+.agent-markdown ul,
+.agent-markdown ol,
+.agent-markdown blockquote,
+.agent-markdown table,
+.agent-markdown hr,
+.agent-markdown .not-prose,
+.agent-markdown .katex-display {
+  margin: 0 0 0.85rem;
+}
+
+.agent-markdown h1,
+.agent-markdown h2,
+.agent-markdown h3,
+.agent-markdown h4,
+.agent-markdown h5,
+.agent-markdown h6 {
+  margin: 1.25rem 0 0.65rem;
+  color: #121418;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.agent-markdown h1 {
+  font-size: 1.72rem;
+}
+
+.agent-markdown h2 {
+  font-size: 1.38rem;
+}
+
+.agent-markdown h3 {
+  font-size: 1.18rem;
+}
+
+.agent-markdown h4 {
+  font-size: 1.04rem;
+}
+
+.agent-markdown h5,
+.agent-markdown h6 {
+  font-size: 1rem;
+}
+
+.agent-markdown strong {
+  font-weight: 700;
+}
+
+.agent-markdown a {
+  color: #1456cc;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.agent-markdown a:hover {
+  color: #0f47aa;
+}
+
+.agent-markdown ul,
+.agent-markdown ol {
+  padding-left: 1.25rem;
+}
+
+.agent-markdown li + li {
+  margin-top: 0.22rem;
+}
+
+.agent-markdown .agent-markdown-task-item {
+  list-style: none;
+}
+
+.agent-markdown .agent-markdown-checkbox {
+  margin-right: 0.55rem;
+  accent-color: #202123;
+}
+
+.agent-markdown blockquote {
+  border-left: 3px solid rgba(32, 33, 35, 0.18);
+  background: rgba(32, 33, 35, 0.035);
+  padding: 0.72rem 0.9rem;
+  color: rgba(32, 33, 35, 0.82);
+}
+
+.agent-markdown hr {
+  border: 0;
+  border-top: 1px solid rgba(32, 33, 35, 0.1);
+}
+
+.agent-inline-code {
+  border: 1px solid rgba(32, 33, 35, 0.08);
+  border-radius: 0.55rem;
+  background: rgba(32, 33, 35, 0.05);
+  padding: 0.1rem 0.38rem;
+  font-family: "Cascadia Mono", "IBM Plex Mono", "Consolas", monospace;
+  font-size: 0.86em;
+}
+
+.agent-markdown-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(32, 33, 35, 0.1);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.agent-markdown table {
+  width: 100%;
+  min-width: 32rem;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.agent-markdown thead {
+  background: rgba(32, 33, 35, 0.05);
+}
+
+.agent-markdown th,
+.agent-markdown td {
+  border-bottom: 1px solid rgba(32, 33, 35, 0.08);
+  padding: 0.68rem 0.82rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.agent-markdown th {
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.agent-markdown td {
+  color: rgba(32, 33, 35, 0.86);
+}
+
+.agent-markdown tbody tr:nth-child(even) {
+  background: rgba(32, 33, 35, 0.018);
+}
+
+.agent-markdown img {
+  display: block;
+  max-width: 100%;
+  border: 1px solid rgba(32, 33, 35, 0.08);
+  border-radius: 0.9rem;
+  background: white;
+}
+
+.agent-markdown section[data-footnotes] {
+  margin-top: 1.25rem;
+  border-top: 1px solid rgba(32, 33, 35, 0.1);
+  padding-top: 0.85rem;
+  color: rgba(32, 33, 35, 0.72);
+  font-size: 0.86rem;
+}
+
+.agent-markdown sup {
+  font-size: 0.78em;
+}
+
+.agent-markdown .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2rem 0;
+}
+
+.agent-markdown .hljs-comment,
+.agent-markdown .hljs-quote {
+  color: #8a94a6;
+}
+
+.agent-markdown .hljs-keyword,
+.agent-markdown .hljs-selector-tag,
+.agent-markdown .hljs-literal,
+.agent-markdown .hljs-section,
+.agent-markdown .hljs-link {
+  color: #b5477d;
+}
+
+.agent-markdown .hljs-string,
+.agent-markdown .hljs-title,
+.agent-markdown .hljs-name,
+.agent-markdown .hljs-type,
+.agent-markdown .hljs-attribute,
+.agent-markdown .hljs-symbol,
+.agent-markdown .hljs-bullet,
+.agent-markdown .hljs-addition {
+  color: #2f8f63;
+}
+
+.agent-markdown .hljs-number,
+.agent-markdown .hljs-regexp,
+.agent-markdown .hljs-template-tag,
+.agent-markdown .hljs-variable,
+.agent-markdown .hljs-template-variable {
+  color: #bf7c2c;
+}
+
+.agent-markdown .hljs-built_in,
+.agent-markdown .hljs-doctag,
+.agent-markdown .hljs-title.class_,
+.agent-markdown .hljs-class .hljs-title {
+  color: #2f6fb5;
+}
+
+.agent-markdown .hljs-emphasis {
+  font-style: italic;
+}
+
+.agent-markdown .hljs-strong {
+  font-weight: 700;
+}
