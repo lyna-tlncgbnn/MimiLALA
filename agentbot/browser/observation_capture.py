@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 from typing import Any
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Frame, Page
 
-from agentbot.browser.session import BrowserRuntimeSession
+if TYPE_CHECKING:
+    from agentbot.browser.session import BrowserRuntimeSession
 
 MAX_RAW_CANDIDATES_PER_DOCUMENT = 120
 AGENTBOT_ELEMENT_ATTR = "data-agentbot-id"
@@ -363,7 +365,7 @@ DOCUMENT_RAW_CAPTURE_SCRIPT = """
 """
 
 
-def capture_raw_observation(runtime: BrowserRuntimeSession) -> BrowserRawObservation:
+def capture_raw_observation(runtime: "BrowserRuntimeSession") -> BrowserRawObservation:
     page = runtime.page
     try:
         page.wait_for_load_state("load", timeout=2000)

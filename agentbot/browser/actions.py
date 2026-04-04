@@ -12,8 +12,20 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from agentbot.browser.session import (
     BrowserRuntimeSession,
+    dispatch_runtime_action,
     record_runtime_event,
     wait_for_runtime_event,
+)
+from agentbot.browser.runtime import (
+    ClickActionEvent,
+    GoBackActionEvent,
+    NavigateActionEvent,
+    NewTabNavigateActionEvent,
+    PressEnterActionEvent,
+    ScrollActionEvent,
+    SwitchTabActionEvent,
+    TypeActionEvent,
+    WaitActionEvent,
 )
 from agentbot.browser.views import (
     BrowserAction,
@@ -31,25 +43,44 @@ def execute_browser_action(
     summary: BrowserStateSummary | None,
 ) -> BrowserActionResult:
     action_type = action.action_type
+    created_at = time.time()
+    result = None
     if action_type == "navigate":
-        return _navigate(runtime, action.url)
-    if action_type == "new_tab_navigate":
-        return _new_tab_navigate(runtime, action.url)
-    if action_type == "click":
-        return _click(runtime, action, summary)
-    if action_type == "type":
-        return _type(runtime, action, summary)
-    if action_type == "press_enter":
-        return _press_enter(runtime)
-    if action_type == "scroll":
-        return _scroll(runtime, action)
-    if action_type == "wait":
-        return _wait(action)
-    if action_type == "go_back":
-        return _go_back(runtime)
-    if action_type == "switch_tab":
-        return _switch_tab(runtime, action.tab_id)
-    raise ValueError(f"Unsupported browser action: {action_type}")
+        if not action.url:
+            raise ValueError("Navigate action requires a target URL.")
+        result = dispatch_runtime_action(runtime, NavigateActionEvent(created_at=created_at, url=action.url))
+    elif action_type == "new_tab_navigate":
+        if not action.url:
+            raise ValueError("New-tab navigate action requires a target URL.")
+        result = dispatch_runtime_action(runtime, NewTabNavigateActionEvent(created_at=created_at, url=action.url))
+    elif action_type == "click":
+        element = _find_element(runtime, summary, action.element_index)
+        _assert_page_still_matches_observation(runtime, summary)
+        result = dispatch_runtime_action(runtime, ClickActionEvent(created_at=created_at, element=element))
+    elif action_type == "type":
+        if not action.text:
+            raise ValueError("Type action requires text.")
+        element = _find_element(runtime, summary, action.element_index)
+        _assert_page_still_matches_observation(runtime, summary)
+        result = dispatch_runtime_action(runtime, TypeActionEvent(created_at=created_at, element=element, text=action.text))
+    elif action_type == "press_enter":
+        result = dispatch_runtime_action(runtime, PressEnterActionEvent(created_at=created_at))
+    elif action_type == "scroll":
+        direction = action.direction or "down"
+        amount = max(100, int(action.amount or 600))
+        result = dispatch_runtime_action(runtime, ScrollActionEvent(created_at=created_at, direction=direction, amount=amount))
+    elif action_type == "wait":
+        seconds = min(max(int(action.amount or 2), 1), 10)
+        result = dispatch_runtime_action(runtime, WaitActionEvent(created_at=created_at, seconds=seconds))
+    elif action_type == "go_back":
+        result = dispatch_runtime_action(runtime, GoBackActionEvent(created_at=created_at))
+    elif action_type == "switch_tab":
+        result = dispatch_runtime_action(runtime, SwitchTabActionEvent(created_at=created_at, tab_id=action.tab_id))
+    else:
+        raise ValueError(f"Unsupported browser action: {action_type}")
+    if result is None:
+        raise ValueError(f"Browser runtime did not handle action: {action_type}")
+    return result
 
 
 def execute_browser_actions(
@@ -283,11 +314,20 @@ def _switch_tab(runtime: BrowserRuntimeSession, tab_id: str | None) -> BrowserAc
     )
 
 
-def _find_element(summary: BrowserStateSummary | None, element_index: int | None) -> BrowserInteractiveElement:
-    if summary is None:
-        raise ValueError("Browser action requires a current page summary.")
+def _find_element(
+    runtime: BrowserRuntimeSession,
+    summary: BrowserStateSummary | None,
+    element_index: int | None,
+) -> BrowserInteractiveElement:
     if element_index is None:
         raise ValueError("Browser action requires an element_index.")
+
+    cached_element = runtime.cached_selector_map.get(element_index)
+    if isinstance(cached_element, BrowserInteractiveElement):
+        return cached_element
+
+    if summary is None:
+        raise ValueError("Browser action requires a current page summary.")
     for element in summary.interactive_elements:
         if element.index == element_index:
             return element

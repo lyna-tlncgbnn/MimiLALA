@@ -11,11 +11,30 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 from urllib.request import urlopen
 from uuid import uuid4
 
 from playwright.sync_api import Browser, BrowserContext, Download, Dialog, Page, Playwright, sync_playwright
 
+from agentbot.browser.runtime import (
+    BrowserClosedEvent,
+    BrowserStateRequestEvent,
+    BrowserRuntimeEventBus,
+    DialogHandledEvent,
+    NavigationCompletedEvent,
+    PageClosedEvent,
+    PageCreatedEvent,
+)
+from agentbot.browser.runtime.watchdogs import (
+    DOMWatchdog,
+    DefaultActionWatchdog,
+    DialogsWatchdog,
+    DownloadsWatchdog,
+    LifecycleWatchdog,
+    NavigationWatchdog,
+    PopupsWatchdog,
+)
 from agentbot.storage.paths import repo_root, workspace_root
 
 
@@ -62,6 +81,23 @@ class BrowserRuntimeSession:
     recent_events: list[dict[str, str]] = field(default_factory=list)
     closed_popup_messages: list[str] = field(default_factory=list)
     observed_page_ids: set[int] = field(default_factory=set)
+    active_downloads: dict[str, dict[str, Any]] = field(default_factory=dict)
+    latest_download_id: str | None = None
+    cached_raw_observation: Any | None = None
+    cached_browser_state: Any | None = None
+    cached_selector_map: dict[int, Any] = field(default_factory=dict)
+    cached_screenshot_path: Path | None = None
+    cached_observation_at: float | None = None
+    event_bus: BrowserRuntimeEventBus | None = None
+    dom_watchdog: DOMWatchdog | None = None
+    downloads_watchdog: DownloadsWatchdog | None = None
+    popups_watchdog: PopupsWatchdog | None = None
+    dialogs_watchdog: DialogsWatchdog | None = None
+    navigation_watchdog: NavigationWatchdog | None = None
+    lifecycle_watchdog: LifecycleWatchdog | None = None
+    default_action_watchdog: DefaultActionWatchdog | None = None
+    download_start_timeout_seconds: float = 4.0
+    download_complete_timeout_seconds: float = 30.0
 
 
 _SESSION_REGISTRY: dict[str, BrowserRuntimeSession] = {}
@@ -77,6 +113,25 @@ def browser_profiles_dir(base_dir: Path | None = None) -> Path:
     path = base_dir or (workspace_root() / "browser_profiles")
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _cleanup_orphan_browser_profiles(temp_profiles_dir: str | None) -> None:
+    profiles_root = _resolve_optional_dir(temp_profiles_dir, default=workspace_root() / "browser_profiles")
+    active_dirs = {
+        runtime.temp_profile_dir.resolve()
+        for runtime in _SESSION_REGISTRY.values()
+        if runtime.temp_profile_dir is not None
+    }
+    for entry in profiles_root.iterdir():
+        if not entry.is_dir() or not entry.name.startswith("browser_session_"):
+            continue
+        try:
+            resolved = entry.resolve()
+        except OSError:
+            resolved = entry
+        if resolved in active_dirs:
+            continue
+        shutil.rmtree(entry, ignore_errors=True)
 
 
 def browser_session_artifacts_dir(session_id: str, *, base_dir: Path | None = None) -> Path:
@@ -111,7 +166,11 @@ def start_browser_session(
     artifacts_dir: str | None = None,
     downloads_dir: str | None = None,
     channel: str | None = None,
+    download_start_timeout_seconds: float = 4.0,
+    download_complete_timeout_seconds: float = 30.0,
 ) -> BrowserSessionState:
+    if mode == "system":
+        _cleanup_orphan_browser_profiles(temp_profiles_dir)
     session_id = f"browser_session_{uuid4().hex}"
     runtime = _create_runtime_session(
         session_id=session_id,
@@ -132,6 +191,8 @@ def start_browser_session(
         artifacts_dir=artifacts_dir,
         downloads_dir=downloads_dir,
         channel=channel,
+        download_start_timeout_seconds=download_start_timeout_seconds,
+        download_complete_timeout_seconds=download_complete_timeout_seconds,
     )
     _SESSION_REGISTRY[session_id] = runtime
     page_title = runtime.page.title() or title
@@ -165,10 +226,39 @@ def get_runtime_session(session_id: str) -> BrowserRuntimeSession:
     return runtime
 
 
+def dispatch_runtime_action(runtime: BrowserRuntimeSession, event) -> Any:
+    if runtime.event_bus is None:
+        raise ValueError("Browser runtime event bus is not initialized.")
+    return runtime.event_bus.request(event)
+
+
+def request_browser_state(
+    runtime: BrowserRuntimeSession,
+    *,
+    include_screenshot: bool = True,
+    include_recent_events: bool = True,
+):
+    if runtime.event_bus is None:
+        raise ValueError("Browser runtime event bus is not initialized.")
+    response = runtime.event_bus.request(
+        BrowserStateRequestEvent(
+            created_at=time.time(),
+            include_screenshot=include_screenshot,
+            include_recent_events=include_recent_events,
+        )
+    )
+    if response is None:
+        raise ValueError("Browser state request did not return a browser state summary.")
+    return response
+
+
 def close_browser_session(session_id: str) -> None:
     runtime = _SESSION_REGISTRY.pop(session_id, None)
     if runtime is None:
         return
+
+    if runtime.event_bus is not None:
+        runtime.event_bus.emit(BrowserClosedEvent(created_at=time.time(), reason="close_browser_session"))
 
     try:
         runtime.context.close()
@@ -213,6 +303,8 @@ def _create_runtime_session(
     artifacts_dir: str | None,
     downloads_dir: str | None,
     channel: str | None,
+    download_start_timeout_seconds: float,
+    download_complete_timeout_seconds: float,
 ) -> BrowserRuntimeSession:
     if mode == "system":
         return _create_system_runtime_session(
@@ -233,6 +325,8 @@ def _create_runtime_session(
             artifacts_dir=artifacts_dir,
             downloads_dir=downloads_dir,
             channel=channel,
+            download_start_timeout_seconds=download_start_timeout_seconds,
+            download_complete_timeout_seconds=download_complete_timeout_seconds,
         )
 
     return _create_playwright_runtime_session(
@@ -248,6 +342,8 @@ def _create_runtime_session(
         artifacts_dir=artifacts_dir,
         downloads_dir=downloads_dir,
         channel=channel,
+        download_start_timeout_seconds=download_start_timeout_seconds,
+        download_complete_timeout_seconds=download_complete_timeout_seconds,
     )
 
 
@@ -265,6 +361,8 @@ def _create_playwright_runtime_session(
     artifacts_dir: str | None,
     downloads_dir: str | None,
     channel: str | None,
+    download_start_timeout_seconds: float,
+    download_complete_timeout_seconds: float,
 ) -> BrowserRuntimeSession:
     playwright = sync_playwright().start()
     launch_args = [f"--window-size={window_width},{window_height}"]
@@ -309,7 +407,10 @@ def _create_playwright_runtime_session(
         profile_directory=None,
         temp_profile_dir=None,
         cdp_url=None,
+        download_start_timeout_seconds=download_start_timeout_seconds,
+        download_complete_timeout_seconds=download_complete_timeout_seconds,
     )
+    _initialize_runtime_watchdogs(runtime)
     _attach_context_handlers(runtime)
     _attach_existing_pages(runtime)
     _navigate_initial_page(runtime.page, initial_url)
@@ -335,19 +436,12 @@ def _create_system_runtime_session(
     artifacts_dir: str | None,
     downloads_dir: str | None,
     channel: str | None,
+    download_start_timeout_seconds: float,
+    download_complete_timeout_seconds: float,
 ) -> BrowserRuntimeSession:
     resolved_executable = _resolve_system_browser_executable(executable_path, channel)
     resolved_user_data_dir = _resolve_system_user_data_dir(user_data_dir, channel, resolved_executable)
     resolved_profile_directory = _resolve_profile_directory(resolved_user_data_dir, profile_directory)
-    profiles_root = _resolve_optional_dir(temp_profiles_dir, default=workspace_root() / "browser_profiles")
-    temp_profile_dir = profiles_root / session_id
-    _prepare_temp_profile_dir(
-        source_user_data_dir=resolved_user_data_dir,
-        profile_directory=resolved_profile_directory,
-        destination=temp_profile_dir,
-        copy_local_profile=copy_local_profile,
-    )
-
     artifacts_root = _resolve_optional_dir(artifacts_dir, default=workspace_root() / "browser_artifacts")
     session_artifacts_dir = browser_session_artifacts_dir(session_id, base_dir=artifacts_root)
     session_downloads_dir = _resolve_downloads_dir(
@@ -355,37 +449,44 @@ def _create_system_runtime_session(
         artifacts_root=artifacts_root,
         downloads_dir=downloads_dir,
     )
+    profiles_root = _resolve_optional_dir(temp_profiles_dir, default=workspace_root() / "browser_profiles")
+    temp_profile_dir = profiles_root / session_id
+    _prepare_temp_profile_dir(
+        source_user_data_dir=resolved_user_data_dir,
+        profile_directory=resolved_profile_directory,
+        destination=temp_profile_dir,
+        copy_local_profile=copy_local_profile,
+        downloads_dir=session_downloads_dir,
+    )
+
+    debug_port = _find_free_port()
+    browser_process = _launch_system_browser_process(
+        executable_path=resolved_executable,
+        user_data_dir=temp_profile_dir,
+        profile_directory=resolved_profile_directory,
+        headless=headless,
+        window_width=window_width,
+        window_height=window_height,
+        start_maximized=start_maximized,
+        debug_port=debug_port,
+    )
+    cdp_url = _wait_for_cdp_url(debug_port)
 
     playwright = sync_playwright().start()
-    launch_args = [
-        f"--profile-directory={resolved_profile_directory}",
-        "--disable-popup-blocking",
-        "--no-first-run",
-        "--no-default-browser-check",
-    ]
-    if start_maximized:
-        launch_args.append("--start-maximized")
-    else:
-        launch_args.append(f"--window-size={window_width},{window_height}")
-
-    launch_kwargs: dict[str, object] = {
-        "user_data_dir": str(temp_profile_dir),
-        "headless": headless,
-        "accept_downloads": True,
-        "args": launch_args,
-    }
-    if no_viewport:
-        launch_kwargs["no_viewport"] = True
-    else:
-        launch_kwargs["viewport"] = {"width": viewport_width, "height": viewport_height}
-    if channel and executable_path is None:
-        launch_kwargs["channel"] = channel
-    else:
-        launch_kwargs["executable_path"] = resolved_executable
-
-    context = playwright.chromium.launch_persistent_context(**launch_kwargs)
-    browser = context.browser
+    browser = playwright.chromium.connect_over_cdp(cdp_url)
+    _configure_browser_download_behavior(browser=browser, downloads_dir=session_downloads_dir)
+    context = browser.contexts[0] if browser.contexts else browser.new_context()
     page = context.pages[0] if context.pages else context.new_page()
+    if no_viewport:
+        try:
+            page.set_viewport_size({"width": window_width, "height": window_height})
+        except Exception:
+            pass
+    else:
+        try:
+            page.set_viewport_size({"width": viewport_width, "height": viewport_height})
+        except Exception:
+            pass
     runtime = BrowserRuntimeSession(
         session_id=session_id,
         mode="system",
@@ -399,8 +500,12 @@ def _create_system_runtime_session(
         user_data_dir=resolved_user_data_dir,
         profile_directory=resolved_profile_directory,
         temp_profile_dir=temp_profile_dir,
-        cdp_url=None,
+        cdp_url=cdp_url,
+        browser_process=browser_process,
+        download_start_timeout_seconds=download_start_timeout_seconds,
+        download_complete_timeout_seconds=download_complete_timeout_seconds,
     )
+    _initialize_runtime_watchdogs(runtime)
     _attach_context_handlers(runtime)
     _attach_existing_pages(runtime)
     _navigate_initial_page(runtime.page, initial_url)
@@ -446,6 +551,24 @@ def wait_for_runtime_event(
     return [event for event in runtime.recent_events[since_index:] if event.get("type") in event_types]
 
 
+def _initialize_runtime_watchdogs(runtime: BrowserRuntimeSession) -> None:
+    runtime.event_bus = BrowserRuntimeEventBus()
+    runtime.dom_watchdog = DOMWatchdog(runtime)
+    runtime.downloads_watchdog = DownloadsWatchdog(runtime)
+    runtime.popups_watchdog = PopupsWatchdog(runtime)
+    runtime.dialogs_watchdog = DialogsWatchdog(runtime)
+    runtime.navigation_watchdog = NavigationWatchdog(runtime)
+    runtime.lifecycle_watchdog = LifecycleWatchdog(runtime)
+    runtime.default_action_watchdog = DefaultActionWatchdog(runtime)
+    runtime.dom_watchdog.register()
+    runtime.downloads_watchdog.register()
+    runtime.popups_watchdog.register()
+    runtime.dialogs_watchdog.register()
+    runtime.navigation_watchdog.register()
+    runtime.lifecycle_watchdog.register()
+    runtime.default_action_watchdog.register()
+
+
 def _attach_existing_pages(runtime: BrowserRuntimeSession) -> None:
     for page in runtime.context.pages:
         _attach_page_handlers(runtime, page)
@@ -454,9 +577,16 @@ def _attach_existing_pages(runtime: BrowserRuntimeSession) -> None:
 def _attach_context_handlers(runtime: BrowserRuntimeSession) -> None:
     def _on_page(page: Page) -> None:
         _attach_page_handlers(runtime, page)
-        record_runtime_event(runtime, "tab_created", f"Opened new tab: {page.url or 'about:blank'}")
+        if runtime.event_bus is not None:
+            runtime.event_bus.emit(PageCreatedEvent(created_at=time.time(), page=page))
 
     runtime.context.on("page", _on_page)
+    if runtime.browser is not None:
+        def _on_disconnected() -> None:
+            if runtime.event_bus is not None:
+                runtime.event_bus.emit(BrowserClosedEvent(created_at=time.time(), reason="browser_disconnected"))
+
+        runtime.browser.on("disconnected", _on_disconnected)
 
 
 def _attach_page_handlers(runtime: BrowserRuntimeSession, page: Page) -> None:
@@ -466,15 +596,28 @@ def _attach_page_handlers(runtime: BrowserRuntimeSession, page: Page) -> None:
     runtime.observed_page_ids.add(page_id)
 
     def _on_dialog(dialog: Dialog) -> None:
-        message = f"{dialog.type}: {dialog.message}"
-        runtime.closed_popup_messages.append(message)
-        record_runtime_event(runtime, "dialog", f"Handled dialog {message}")
+        if runtime.event_bus is not None:
+            runtime.event_bus.emit(
+                DialogHandledEvent(
+                    created_at=time.time(),
+                    dialog_type=dialog.type,
+                    message=dialog.message,
+                )
+            )
+        else:
+            message = f"{dialog.type}: {dialog.message}"
+            runtime.closed_popup_messages.append(message)
+            record_runtime_event(runtime, "dialog", f"Handled dialog {message}")
         try:
             dialog.dismiss()
         except Exception:
             pass
 
     def _on_download(download: Download) -> None:
+        if runtime.event_bus is not None and runtime.downloads_watchdog is not None:
+            event = runtime.downloads_watchdog.prepare_download_event(download=download, page=page)
+            runtime.event_bus.emit(event)
+            return
         try:
             suggested = download.suggested_filename or "download"
             destination = _unique_download_path(runtime.downloads_dir, suggested)
@@ -486,10 +629,29 @@ def _attach_page_handlers(runtime: BrowserRuntimeSession, page: Page) -> None:
 
     def _on_frame_navigated(frame) -> None:
         if frame == page.main_frame:
-            record_runtime_event(runtime, "navigation", f"Navigated to {page.url or 'about:blank'}")
+            if runtime.event_bus is not None:
+                runtime.event_bus.emit(
+                    NavigationCompletedEvent(
+                        created_at=time.time(),
+                        url=page.url or "about:blank",
+                        page=page,
+                    )
+                )
+            else:
+                record_runtime_event(runtime, "navigation", f"Navigated to {page.url or 'about:blank'}")
 
     def _on_close() -> None:
-        record_runtime_event(runtime, "page_closed", f"Closed page: {page.url or 'about:blank'}")
+        if runtime.event_bus is not None:
+            runtime.event_bus.emit(
+                PageClosedEvent(
+                    created_at=time.time(),
+                    page_url=page.url or "about:blank",
+                    page=page,
+                    is_active_page=(runtime.page == page),
+                )
+            )
+        else:
+            record_runtime_event(runtime, "page_closed", f"Closed page: {page.url or 'about:blank'}")
 
     page.on("dialog", _on_dialog)
     page.on("download", _on_download)
@@ -639,6 +801,7 @@ def _prepare_temp_profile_dir(
     profile_directory: str,
     destination: Path,
     copy_local_profile: bool,
+    downloads_dir: Path,
 ) -> None:
     if destination.exists():
         shutil.rmtree(destination, ignore_errors=True)
@@ -652,9 +815,99 @@ def _prepare_temp_profile_dir(
         local_state_source = source_user_data_dir / "Local State"
         if local_state_source.exists():
             shutil.copy2(local_state_source, destination / "Local State")
-        return
+    else:
+        profile_destination.mkdir(parents=True, exist_ok=True)
 
-    profile_destination.mkdir(parents=True, exist_ok=True)
+    _apply_download_preferences(profile_destination, downloads_dir)
+
+
+def _apply_download_preferences(profile_directory: Path, downloads_dir: Path) -> None:
+    preferences_path = profile_directory / "Preferences"
+    payload: dict[str, Any]
+    if preferences_path.exists():
+        try:
+            payload = json.loads(preferences_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            payload = {}
+    else:
+        payload = {}
+
+    download_settings = payload.get("download")
+    if not isinstance(download_settings, dict):
+        download_settings = {}
+        payload["download"] = download_settings
+    download_settings.update(
+        {
+            "default_directory": str(downloads_dir),
+            "directory_upgrade": True,
+            "prompt_for_download": False,
+        }
+    )
+
+    savefile_settings = payload.get("savefile")
+    if not isinstance(savefile_settings, dict):
+        savefile_settings = {}
+        payload["savefile"] = savefile_settings
+    savefile_settings["default_directory"] = str(downloads_dir)
+
+    plugins_settings = payload.get("plugins")
+    if not isinstance(plugins_settings, dict):
+        plugins_settings = {}
+        payload["plugins"] = plugins_settings
+    plugins_settings.setdefault("always_open_pdf_externally", True)
+
+    preferences_path.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+
+
+def _launch_system_browser_process(
+    *,
+    executable_path: str,
+    user_data_dir: Path,
+    profile_directory: str,
+    headless: bool,
+    window_width: int,
+    window_height: int,
+    start_maximized: bool,
+    debug_port: int,
+) -> subprocess.Popen[bytes]:
+    launch_args = [
+        executable_path,
+        f"--user-data-dir={user_data_dir}",
+        f"--profile-directory={profile_directory}",
+        f"--remote-debugging-port={debug_port}",
+        "--disable-popup-blocking",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-background-networking",
+        "--disable-renderer-backgrounding",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-features=CalculateNativeWinOcclusion",
+        "--ash-no-nudges",
+        "--silent-debugger-extension-api",
+    ]
+    if headless:
+        launch_args.append("--headless=new")
+    if start_maximized:
+        launch_args.append("--start-maximized")
+    else:
+        launch_args.append(f"--window-size={window_width},{window_height}")
+    return subprocess.Popen(launch_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def _configure_browser_download_behavior(*, browser: Browser, downloads_dir: Path) -> None:
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        cdp_session = browser.new_browser_cdp_session()
+        cdp_session.send(
+            "Browser.setDownloadBehavior",
+            {
+                "behavior": "allow",
+                "downloadPath": str(downloads_dir),
+                "eventsEnabled": True,
+            },
+        )
+    except Exception:
+        pass
 
 
 def _terminate_process(process: subprocess.Popen[bytes]) -> None:

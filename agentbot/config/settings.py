@@ -31,6 +31,8 @@ DEFAULT_BROWSER_WINDOW_HEIGHT = 900
 DEFAULT_BROWSER_NO_VIEWPORT = False
 DEFAULT_BROWSER_START_MAXIMIZED = False
 DEFAULT_BROWSER_COPY_LOCAL_PROFILE = True
+DEFAULT_BROWSER_DOWNLOAD_START_TIMEOUT_SECONDS = 4.0
+DEFAULT_BROWSER_DOWNLOAD_COMPLETE_TIMEOUT_SECONDS = 30.0
 DEFAULT_ALLOWED_COMMAND_PROGRAMS = (
     ".venv\\Scripts\\python.exe",
     "python",
@@ -101,6 +103,8 @@ class BrowserSettings:
     artifacts_dir: str | None = None
     downloads_dir: str | None = None
     channel: str | None = None
+    download_start_timeout_seconds: float = DEFAULT_BROWSER_DOWNLOAD_START_TIMEOUT_SECONDS
+    download_complete_timeout_seconds: float = DEFAULT_BROWSER_DOWNLOAD_COMPLETE_TIMEOUT_SECONDS
 
 
 @dataclass(slots=True)
@@ -403,6 +407,14 @@ def _parse_browser_settings(raw_payload) -> BrowserSettings | None:
     artifacts_dir = _parse_optional_string(raw_payload.get("artifacts_dir"))
     downloads_dir = _parse_optional_string(raw_payload.get("downloads_dir"))
     channel = _parse_optional_string(raw_payload.get("channel"))
+    download_start_timeout_seconds = _parse_optional_positive_float(
+        raw_payload.get("download_start_timeout_seconds", DEFAULT_BROWSER_DOWNLOAD_START_TIMEOUT_SECONDS),
+        field_name="browser.download_start_timeout_seconds",
+    ) or DEFAULT_BROWSER_DOWNLOAD_START_TIMEOUT_SECONDS
+    download_complete_timeout_seconds = _parse_optional_positive_float(
+        raw_payload.get("download_complete_timeout_seconds", DEFAULT_BROWSER_DOWNLOAD_COMPLETE_TIMEOUT_SECONDS),
+        field_name="browser.download_complete_timeout_seconds",
+    ) or DEFAULT_BROWSER_DOWNLOAD_COMPLETE_TIMEOUT_SECONDS
 
     return BrowserSettings(
         headless=headless_raw,
@@ -424,6 +436,8 @@ def _parse_browser_settings(raw_payload) -> BrowserSettings | None:
         artifacts_dir=artifacts_dir,
         downloads_dir=downloads_dir,
         channel=channel,
+        download_start_timeout_seconds=download_start_timeout_seconds,
+        download_complete_timeout_seconds=download_complete_timeout_seconds,
     )
 
 

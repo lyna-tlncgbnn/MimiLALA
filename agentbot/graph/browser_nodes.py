@@ -103,6 +103,8 @@ def browser_prepare(state: AgentGraphState) -> dict[str, Any]:
         artifacts_dir=None if settings.browser is None else settings.browser.artifacts_dir,
         downloads_dir=None if settings.browser is None else settings.browser.downloads_dir,
         channel=None if settings.browser is None else settings.browser.channel,
+        download_start_timeout_seconds=4.0 if settings.browser is None else settings.browser.download_start_timeout_seconds,
+        download_complete_timeout_seconds=30.0 if settings.browser is None else settings.browser.download_complete_timeout_seconds,
     )
     timestamp = _now_iso()
     root_key = "browser_root"
@@ -187,6 +189,8 @@ def browser_prepare(state: AgentGraphState) -> dict[str, Any]:
                     "cdp_url": session.cdp_url,
                     "artifacts_dir": session.artifacts_dir,
                     "downloads_dir": session.downloads_dir,
+                    "download_start_timeout_seconds": 4.0 if settings.browser is None else settings.browser.download_start_timeout_seconds,
+                    "download_complete_timeout_seconds": 30.0 if settings.browser is None else settings.browser.download_complete_timeout_seconds,
                 },
             },
         ],
@@ -691,6 +695,7 @@ def browser_finish(state: AgentGraphState) -> dict[str, Any]:
         loop_signal=loop_signal,
         failure_reason=failure_reason,
         last_action_success=last_action_success,
+        last_action_output=last_action_result.get("output") if isinstance(last_action_result.get("output"), dict) else {},
     )
 
     if requires_approval:
@@ -817,11 +822,20 @@ def _assess_browser_completion(
     loop_signal: str,
     failure_reason: str,
     last_action_success: bool,
+    last_action_output: dict[str, Any] | None = None,
 ) -> tuple[str, str | None]:
+    action_output = last_action_output or {}
     if requires_approval:
         return "approval_required", None
     if failure_reason:
         return "failed", failure_reason
+    if action_output.get("download"):
+        return "completed", "The requested download completed successfully."
+    if action_output.get("download_error"):
+        message = str(action_output.get("download_error", {}).get("message") or "").strip()
+        return "incomplete", message or "The download was triggered but failed while being saved."
+    if action_output.get("download_started") or action_output.get("download_in_progress"):
+        return "completed", "The requested download has already started; do not click the download button again."
     if not last_action_success:
         return "incomplete", "The last browser action failed."
     if pending_action_type != "done" and action_count >= max_actions:
@@ -933,6 +947,14 @@ def _build_browser_progress_signal(
     action_output: dict[str, Any],
     loop_signal: str,
 ) -> str:
+    if action_output.get("download"):
+        return "The last browser action completed the requested download successfully."
+    if action_output.get("download_started"):
+        return "The last browser action already started the requested download. Do not click the download control again; wait or finish."
+    if action_output.get("download_in_progress"):
+        return "The requested download is already in progress. Do not retry the click; wait for the download to complete."
+    if action_output.get("download_error"):
+        return "The browser triggered the requested download, but saving the file failed. Do not keep clicking; inspect the download error and recover."
     if action_type == "done":
         return "The planner chose to stop and finalize the browser task."
     if not action_success:

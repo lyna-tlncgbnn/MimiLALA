@@ -2,127 +2,122 @@
 
 ## 目标
 
-这份文档用于跟踪 AgentBot 浏览器子图继续向 `browser-use` 靠拢时，哪些能力值得迁移、哪些边界当前保持不变，以及推荐的实施顺序。
+这份文档用于跟踪 AgentBot 浏览器子图继续向 `browser-use` 靠拢时，哪些能力已经迁移，哪些还值得继续做，以及推荐的实施顺序。
 
 前提保持不变：
 
 - 浏览器 agent 继续作为 LangGraph 子图存在
-- 不把浏览器细节上浮到主图或 transcript 主链路
-- 不破坏现有 run / run_steps / artifacts / timeline / 数据落盘
+- 不把浏览器细节上浮到主图和 transcript 主链路
+- 不破坏现有 `run / run_steps / artifacts / timeline / 数据落盘`
 
-## 已经迁移或已明显借鉴
+## 已经完成或已明显借鉴
 
 - [x] 浏览器任务以 specialist subgraph 形式运行
-- [x] 观察-规划-执行-评估的浏览器闭环
+- [x] observation -> planning -> action -> evaluate 的浏览器闭环
 - [x] 稳定 selector 映射替代 DOM 序号回放
-- [x] 面向 LLM 的可交互页面摘要
+- [x] 面向 LLM 的 browser state summary
 - [x] iframe-aware observation
-- [x] AX / aria 相关信息补充
-- [x] 轻量 loop detection
-- [x] runtime 事件回收：navigation / dialog / download / tab
-- [x] planner prompt 借鉴 `system_prompt_no_thinking.md` 的高价值浏览器规则
-- [x] 第一轮关键动作补充：`press_enter`、`new_tab_navigate`
+- [x] AX / aria 信息补充
+- [x] planner state：`evaluation_previous_goal / memory / next_goal`
+- [x] 多动作 step
+- [x] 本机浏览器 profile 复制到 workspace 临时目录
+- [x] runtime event bus 基础骨架
+- [x] downloads / popups / dialogs / navigation / lifecycle watchdog
+- [x] BrowserStateRequestEvent -> DOMWatchdog -> runtime browser state cache
+- [x] selector map 开始归 runtime 持有
 
-## 高优先级待迁移
+## 当前高优先级待迁移
 
-### 1. Planner state 更像 browser-use
+### 1. runtime effect object 继续统一
 
-- [x] 在浏览器子图状态里引入更明确的上一步评估字段
-- [x] 给 planner 显式输入 `evaluation_previous_goal`
-- [x] 给 planner 增加轻量 `memory` 字段，而不是只看动作历史
-- [x] 让 planner 更稳定地区分“已完成 / 未完成 / 卡住 / 需要换策略”
-
-价值：
-
-- 直接提升“聪明感”
-- 降低搜索、自动完成、弹窗场景下的误判
-- 比先上 event bus/watchdog 的收益更直接
-
-### 2. 更丰富的浏览器动作集合
-
-- [ ] `dismiss_overlay` / `close_popup`
-- [ ] `open_link_in_new_tab`
-- [ ] `extract_page` 或轻量页面深读动作
-- [ ] 更明确的 `select_suggestion` / combobox 处理
-- [ ] `hover`
-- [ ] `select_option`
+- [ ] 把当前 action output 里的平铺字段进一步收束成更清晰的 runtime effect object
+- [ ] 区分 download started / in progress / completed / failed 的统一结果对象
+- [ ] 区分 popup opened / popup closed / active page closed / browser closed 的统一结果对象
+- [ ] graph 尽量少直接理解底层浏览器细节
 
 价值：
 
-- 让提示词里的规则有对应的 runtime 能力
-- 减少“模型知道该怎么做，但没有合适动作”的落差
+- 降低 graph 层的字段拼装复杂度
+- 继续向 `browser-use` 的“runtime 先建模，planner 再消费”靠拢
 
-### 3. Observation 再继续向 browser-use 靠拢
+### 2. DOM/watchdog 继续做厚
 
-- [x] 把 observation 拆成 raw capture + serialization 两段式
-- [x] 在 summary 中补 semantic groups / prioritized hints
-- [ ] 更强的 modal / overlay / cookie banner 识别
-- [ ] 更稳定的新旧元素差异标识
-- [ ] 更清晰的元素层级和父子关系表达
-- [ ] 更丰富的页面错误 / 阻塞态标记
-- [ ] 如果需要，再评估截图框选标注层
+- [x] DOM/watchdog 已接入 runtime 总线
+- [x] browser state request 已经由 runtime 统一处理
+- [ ] 更明确的 DOM cache invalidation 策略
+- [ ] 更完整的 frame/tab 级 DOM state cache
+- [ ] 更强的页面差异和阻塞态识别
+- [ ] 更丰富的 browser state 元数据
 
 价值：
 
-- 继续提升 planner 判断质量
-- 帮助模型优先处理阻塞页面元素
+- 提升 observation 稳定性
+- 减少 graph 与 runtime 状态漂移
+
+### 3. planner 对 runtime effect 的消费继续收紧
+
+- [x] 已识别 download started / in progress / completed
+- [ ] 对 popup / active page close / browser close 做更细粒度规划与汇总
+- [ ] 根据 runtime effect 显式决定 wait / re-observe / finish，而不是靠更多 prompt 猜测
+- [ ] 把更多“动作之后发生了什么”判断沉到底层 runtime
+
+价值：
+
+- 进一步减少“按钮其实已经生效，但 agent 以为没有生效”
+- 降低重复点击、重复提交、误判失败
 
 ## 中优先级待迁移
 
-### 4. 下载 / 新标签页 / 页面副作用继续细化
+### 4. 更完整的本地浏览器生命周期
 
-- [ ] 新 tab 的父子关系记录
-- [ ] 新 tab 焦点策略与回切策略
-- [ ] 更清晰的下载完成 / 下载中 / 下载失败状态
-- [ ] PDF 相关专项处理
+- [x] system browser 模式已经可用
+- [ ] 评估是否需要 `user_data_dir` 更细粒度配置文档
+- [ ] 评估是否需要 channel / executable_path / profile_directory 的更强排障信息
+- [ ] 评估是否需要更接近 `browser-use` 的 local browser watchdog 组织方式
 
-### 5. 更完整的 done / 完成校验语义
+### 5. 更丰富的浏览器动作集
 
-- [ ] 在子图内部显式记录任务完成核验结果
-- [ ] 对“任务成功完成”和“提前结束”做更清晰区分
-- [ ] 必要时为 browser_finish 增加更结构化结果模型
+- [ ] `dismiss_overlay` / `close_popup`
+- [ ] `hover`
+- [ ] `select_option`
+- [ ] 更明确的 suggestion / combobox 选择动作
+- [ ] `extract_page` 或轻量深读动作
 
-### 6. 轻量 plan / todo 能力
+### 6. 更完整的完成语义
 
-- [ ] 只在复杂长任务下启用浏览器子图内部 plan
-- [ ] 不直接照搬 browser-use 全量文件工具链
-- [ ] 先评估是否需要最小 todo state，而不是文件写入
+- [ ] 对“任务已完成”和“只是停止执行”做更强区分
+- [ ] 浏览器子图内部完成判定继续对齐 runtime effect
+- [ ] `browser_finish` 汇总进一步结构化
 
-## 低优先级或暂不建议立刻迁移
+## 当前低优先级或暂不直接迁移
 
-### 7. Event bus / watchdog 全量架构
+### 7. browser-use 完整 CDP DOM / AX tree 建模
 
-- [ ] 继续观察 `actions.py` 和 `session.py` 的复杂度是否明显上升
-- [ ] 如果副作用处理开始分散失控，再拆成 watcher / handler
-- [ ] 先做轻量 runtime 分层，再决定是否抽成 event bus
+- [ ] 当前先不整体迁移
+- [ ] 先继续把现有 observation pipeline 和 runtime DOM cache 做扎实
+- [ ] 等确实需要更强 DOM fidelity 时再评估
 
-当前判断：
+### 8. browser-use 完整 agent/file 工具链
 
-- 这是中期演进方向
-- 不是现在的第一优先级
-
-### 8. browser-use 完整 Agent loop 输出结构
-
-- [ ] 暂不直接迁移 `plan_update` / `current_plan_item` / 文件工具协议
-- [ ] 暂不迁移整套 browser-use `done` schema
-- [x] 浏览器子图已支持 browser-use 风格的多动作 step 输出与顺序执行
-
-当前判断：
-
-- 当前保留 LangGraph 子图外壳，但内部 step 已升级为多动作序列
-- 等 planner state 和动作集合再长一层后再评估
+- [ ] 暂不迁移完整文件工具链
+- [ ] 暂不迁移 browser-use 完整 `done` schema
+- [ ] 继续保留本项目自己的 LangGraph 子图外壳与状态协议
 
 ## 推荐实施顺序
 
-1. 先做 planner state 增强
-2. 再做第二轮关键浏览器动作
-3. 再做 observation 的阻塞态识别增强
-4. 然后再看 runtime 分层是否值得继续抽象
-5. 最后才考虑 event bus / watchdog 化和更完整 agent loop
+1. 继续统一 runtime effect object
+2. 继续做厚 DOM/watchdog 和 browser state cache
+3. 收紧 graph 层对 runtime effect 的消费
+4. 再扩动作集与完成语义
+5. 最后再评估是否继续往更重的 CDP/session/watchdog 生命周期组织方式迁移
 
-## 不建议跨越的边界
+## 当前判断
 
-- 不把浏览器 agent 下沉成普通 tool 黑盒
-- 不把浏览器动作直接塞回主 agent 的普通 tool loop
-- 不改动现有 run-oriented persistence 主链路
-- 不为了模仿 browser-use 而放弃 LangGraph 子图编排
+浏览器子图现在已经不再只是“浏览器工具集合”，而开始具备 `browser-use` 风格的内核分层：
+
+- planner 是 planner
+- runtime 是 runtime
+- DOM state 是通过 runtime 请求
+- 副作用由 watchdog 吸收
+
+接下来的重点，不是再堆补丁，而是继续让 graph 只消费 runtime 建好的事实。

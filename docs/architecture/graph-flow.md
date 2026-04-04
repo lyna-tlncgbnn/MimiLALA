@@ -2,7 +2,7 @@
 
 ## 当前图结构
 
-当前 LangGraph 已经不是单一的 `chatbot -> tools -> chatbot`。主图现在包含一个浏览器意图分流节点和一个浏览器子图：
+当前 LangGraph 已经不是单一的 `chatbot -> tools -> chatbot`。主图现在包含一个浏览器意图分流节点、一个浏览器子图，以及一个主图侧的浏览器结果总结节点：
 
 ```text
 START
@@ -13,8 +13,8 @@ START
 
 关键构建文件：
 
-- `agentbot/graph/builder.py`
-- `agentbot/graph/browser_subgraph.py`
+- [builder.py](/F:/AgentBot/agentbot/graph/builder.py)
+- [browser_subgraph.py](/F:/AgentBot/agentbot/graph/browser_subgraph.py)
 
 ## 主图职责
 
@@ -24,39 +24,38 @@ START
 
 - 从最新用户消息判断是否进入浏览器任务
 - 提取 `browser_task`
-- 为后续子图准备浏览器相关状态字段
+- 为浏览器子图准备状态字段
 
 ### `chatbot`
 
 负责：
 
-- 调用绑定普通 tools 的 chat model
-- 产出 assistant 消息
-- 决定是否发起 tool calls
+- 调用主聊天模型
+- 产出普通 assistant 消息
+- 决定是否触发普通 tools
 
 ### `tools`
 
 负责：
 
-- 执行注册的普通工具
-- 将工具结果回送给 graph
+- 执行已注册的普通工具
+- 将结果回送给主图
 
 ### `browser_subgraph`
 
 负责：
 
 - 浏览器任务的专用执行闭环
-- 页面观察、动作规划、动作执行、结果评估
-- 输出浏览器域结果并回到主图总结节点
-- 将浏览器域复杂度留在子图内部，而不是上浮到主图
+- 处理页面观察、动作规划、动作执行、执行评估和完成收口
+- 输出浏览器域结果，再回到主图
 
 ### `browser_summary`
 
 负责：
 
-- 接收浏览器子图的结构化执行结果
-- 以主 agent 口吻向用户总结浏览器任务 outcome
-- 在浏览器完成、未完成、失败、人工确认等场景下统一生成最终用户回复
+- 接收浏览器子图的结构化结果
+- 由主 agent 风格汇总给用户
+- 在成功、未完成、失败、需人工确认等场景统一生成最终说明
 
 ## 浏览器子图
 
@@ -76,61 +75,167 @@ browser_prepare
 
 负责：
 
-- 创建 Playwright 浏览器会话
+- 创建浏览器会话
 - 初始化浏览器子图状态
-- 写入浏览器任务根时间线事件
+- 记录浏览器任务根 timeline event
+- 把实际生效的浏览器配置写入 `run_steps`
+
+当前准备阶段已经能够记录：
+
+- `mode`
+- `headless`
+- `window_width / window_height`
+- `no_viewport`
+- `profile_directory`
+- `temp_profile_dir`
+- `downloads_dir`
+- 下载相关 timeout
 
 ### `browser_observe`
 
 负责：
 
-- 读取当前页面状态
-- 提取主文本、分页/滚动信息、标签页信息
-- 提取经过可见性过滤后的交互元素列表
-- 为本轮交互元素生成稳定 selector 映射
-- 生成面向 LLM 的页面摘要
-- 回收近期浏览器事件
+- 通过 runtime 请求当前 browser state
+- 获取 DOM summary、interactive elements、semantic groups、page info、recent events
+- 生成 observation fingerprint
+- 计算 stagnation / loop signal 所需输入
+- 记录 observation step 到 timeline
+
+当前链路已经不是 graph 自己直接读取页面，而是：
+
+```text
+browser_observe
+  -> capture_page_state()
+    -> request_browser_state()
+      -> BrowserStateRequestEvent
+        -> DOMWatchdog
+          -> raw capture
+          -> serialization
+          -> screenshot
+          -> runtime cache
+```
+
+这一步是当前子图结构升级的重点之一：graph 只拿 browser state summary，而不再自己承担 DOM 采集和 cache 管理职责。
 
 ### `browser_decide`
 
 负责：
 
-- 基于页面摘要和历史动作规划单步浏览器动作
-- 只返回结构化动作，不直接执行
-- 对敏感动作做 approval gating
-- 使用适配后的 browser-use 风格规则进行单步规划
+- 基于 browser state summary、planner state、action history、loop/progress signal 规划下一步
+- 输出结构化动作序列，而不是自由文本
+- 更新 planner state：
+  - `evaluation_previous_goal`
+  - `memory`
+  - `next_goal`
+  - `browser_plan`
+  - `browser_current_plan_item`
+- 在预算耗尽或 loop signal 触发时收口为 `done`
 
-当前仍保持单动作 `BrowserAction` 协议，而不是完整多动作 agent loop。
+当前 prompt 已经大量借鉴 `browser-use`，但保留本项目的 LangGraph 状态模型。
 
 ### `browser_act`
 
 负责：
 
-- 执行结构化浏览器动作
-- 使用 `browser_observe` 生成的稳定 selector 绑定真实元素
-- 产出动作结果和动作截图
-- 回收 runtime 级副作用信号，例如 navigation / dialog / download / tab
+- 执行结构化浏览器动作序列
+- 截图并记录 action step 输出
+- 处理中断：
+  - `page_changed`
+  - `observation_stale`
+  - popup/new tab
+  - download started / in progress / completed
+
+当前链路已经变成：
+
+```text
+BrowserAction
+  -> actions.py compatibility layer
+    -> runtime action event
+      -> DefaultActionWatchdog
+        -> Playwright operation
+        -> runtime effect collection
+```
+
+动作执行时，元素解析会优先使用 runtime cache 中的 selector map，而不是只依赖 graph state 里的 summary 副本。
 
 ### `browser_evaluate`
 
 负责：
 
 - 统计动作预算
-- 更新 loop signal
-- 判断继续观察还是结束
+- 写入 action history
+- 基于 runtime effect 更新 progress signal
+- 识别：
+  - `download_started`
+  - `download_in_progress`
+  - `download`
+  - `page_changed`
+  - `failure`
+- 决定继续 observe 还是 finish
+
+这一步已经不再只是“动作有没有成功”，而开始消费 runtime 层对副作用的结构化判断。
 
 ### `browser_finish`
 
 负责：
 
-- 汇总浏览器结果
+- 汇总浏览器任务结果
 - 关闭浏览器会话
-- 生成最终 assistant 消息
-- 输出浏览器时间线结束事件
+- 生成子图侧结束状态
+- 输出 timeline 结束事件
 
-## 状态模型
+当前浏览器子图已经保证：
 
-主状态仍然基于 `MessagesState` 扩展，但现在增加了浏览器子图字段：
+- 成功会进入 `browser_finish`
+- 未完成会进入 `browser_finish`
+- 失败会进入 `browser_finish`
+- 浏览器被关闭等异常也会被 funnel 到 `browser_finish`
+
+然后再交给主图的 `browser_summary` 统一总结。
+
+## graph 与 runtime 的当前边界
+
+### graph 当前负责
+
+- 子图循环编排
+- planner prompt 与 planner state
+- 预算控制
+- run_steps / browser_events / timeline 输出
+- 任务级汇总与主图总结
+
+### runtime 当前负责
+
+- 浏览器会话生命周期
+- 本地 browser profile 与 downloads/artifacts
+- event bus
+- watchdog 分层
+- 动作执行中间层
+- browser state request
+- DOM cache / selector map cache
+- 副作用吸收：
+  - download
+  - dialog
+  - navigation
+  - popup/tab
+  - page/browser close
+
+## 为什么要把 DOM/watchdog 并进 runtime
+
+如果 DOM 状态继续由 graph 直接调 `dom_service`：
+
+- graph 会知道太多浏览器内部细节
+- selector map 和 observation cache 无法由 runtime 统一管理
+- 动作执行与页面状态之间会继续出现漂移
+- 也不利于继续对齐 `browser-use`
+
+当前 DOMWatchdog 接入以后，这个边界更清晰了：
+
+- graph 请求 browser state
+- runtime 决定如何构建、缓存、失效和返回 browser state
+
+## 当前状态字段
+
+浏览器子图当前重点字段包括：
 
 - `browser_task`
 - `browser_status`
@@ -138,91 +243,36 @@ browser_prepare
 - `browser_state_summary`
 - `browser_pending_action`
 - `browser_pending_actions`
+- `browser_last_action_result`
 - `browser_last_action_results`
 - `browser_action_history`
 - `browser_action_count`
 - `browser_loop_signal`
-- `browser_requires_approval`
+- `browser_progress_signal`
+- `browser_evaluation_previous_goal`
+- `browser_memory`
+- `browser_next_goal`
+- `browser_plan`
+- `browser_current_plan_item`
 - `browser_events`
 
 定义位置：
 
-- `agentbot/graph/state.py`
+- [state.py](/F:/AgentBot/agentbot/graph/state.py)
 
-## Checkpoint 集成
+## 当前演进位置
 
-当前 graph 编译时仍然接入：
+浏览器子图当前已经完成这些关键升级：
 
-- `agentbot/graph/checkpoints.py`
+1. 观察、规划、执行、评估、结束的完整子图闭环
+2. 浏览器结果返回主图总结，而不是子图直接终止整个主图
+3. 多动作 step
+4. planner state
+5. runtime event bus + watchdog 初步成型
+6. DOM/watchdog 开始并入 runtime
 
-核心对象：
+这意味着浏览器问题的主矛盾已经从“能不能打开浏览器”转向：
 
-- `SqliteSaver`
-
-当前规则：
-
-- 每个 `run` 使用自己的 `thread_id`
-- `thread_id` 当前与 `run_id` 对齐，用于隔离单轮 LangGraph checkpoint state
-- 每轮都会从 transcript 重新构建输入消息，而不是复用上一轮的 graph state
-- 浏览器子图也运行在同一条 LangGraph durable execution 链路内
-
-## 同步与流式
-
-两条执行路径继续复用同一份 graph：
-
-- `agentbot/app/runner.py`
-- `agentbot/app/streaming_runner.py`
-
-区别不在 graph 结构，而在：
-
-- 如何消费 runtime events
-- 如何组织 transcript / active run / run_steps
-- 如何把 graph 事件映射到前端时间线
-
-## 当前边界
-
-当前已经具备：
-
-- 浏览器子图
-- 浏览器意图分流
-- 单会话浏览器观察/规划/执行闭环
-- 基于稳定 selector 的页面元素动作绑定
-- iframe-aware observation 与 AX / aria 辅助信息
-- browser-use 风格规则适配后的 planner prompt
-- `press_enter` / `new_tab_navigate` 等搜索与研究场景动作
-- navigation / dialog / download / tab 的 runtime 事件回收
-
-当前仍未系统化引入：
-
-- 多 browser session 编排
-- browser event bus / watchdog 体系
-- CDP DOM / AX tree 全量建模
-- browser-use 完整多动作 agent loop 协议
-- long-term memory state
-- 多 agent orchestration
-
-## 浏览器子图职责边界
-
-浏览器子图当前负责：
-
-- 单浏览器会话生命周期管理
-- 单任务范围内的浏览器动作循环
-- 面向浏览器域的 observation、planner prompt、结构化动作和 runtime 副作用处理
-- 浏览器 artifacts、页面摘要和子图 timeline 输出
-
-浏览器子图当前不负责：
-
-- 主图普通 tools 的调度策略
-- 多浏览器会话协同
-- `browser-use` 完整 event bus / watchdog 基础设施
-- `browser-use` 完整文件工具链和多动作 step 输出
-
-## 下一步
-
-继续向 `browser-use` 靠拢时，当前优先顺序是：
-
-1. planner state 增强，例如显式上一步评估和轻量 memory
-2. 第二轮关键浏览器动作补充，例如 overlay / popup / extract / select_option
-3. observation 继续加强阻塞态识别、页面差异表达和可操作视图质量
-
-具体迁移清单以 [browser-use-migration-todo.md](/F:/AgentBot/docs/architecture/browser-use-migration-todo.md) 为准。
+- browser state 是否由 runtime 正确管理
+- runtime effect 是否能被 graph 正确消费
+- planner 是否建立在足够稳定的 browser state 之上
