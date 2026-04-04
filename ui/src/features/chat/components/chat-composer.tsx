@@ -15,7 +15,7 @@ export const ChatComposer = memo(function ChatComposer({
   onSend: () => void | Promise<void>;
 }) {
   return (
-    <div className="mt-2 shrink-0 flex justify-center">
+    <div className="mt-2 flex shrink-0 justify-center">
       <div className="flex w-full items-center gap-2 rounded-[12px] border border-border bg-[rgba(255,255,255,0.98)] px-3 py-2 shadow-[0_8px_24px_rgba(32,33,35,0.05)] sm:w-[88%] md:w-[68%] md:min-w-[520px] xl:w-1/2 xl:max-w-[820px]">
         <input
           className="h-8 w-full min-w-0 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"

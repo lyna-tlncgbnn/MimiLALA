@@ -1,13 +1,13 @@
 import { memo, useEffect, useMemo, useRef } from "react";
 import { Bot, Sparkles } from "lucide-react";
 
-import type { ChatMessage } from "@/shared/api/api";
+import type { ChatMessage } from "@/features/chat/api/chat-schemas";
 import { MessageCard } from "@/features/chat/components/message-card";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
 const emptyStatePrompts = [
   "帮我总结一下这个项目目前的架构。",
-  "读取某个文件然后帮我做一个摘要。",
+  "读取某个文件，然后帮我做一个摘要。",
   "帮我新建一个会话，并规划一下下一步开发任务。",
   "告诉我当前默认会话里最近做了什么。",
 ];

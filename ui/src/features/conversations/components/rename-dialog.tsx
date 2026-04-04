@@ -26,7 +26,7 @@ export function RenameDialog({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent>
         <h2 className="text-[18px] font-semibold text-foreground">重命名会话</h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">修改左侧会话列表中的显示名称。</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">修改侧边栏会话列表中的显示名称。</p>
 
         <input
           className="mt-5 h-11 w-full rounded-[14px] border border-border bg-[rgba(255,255,255,0.88)] px-4 text-[14px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"

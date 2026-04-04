@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import {
   BookOpenText,
@@ -117,7 +117,7 @@ function StepRow({
             <StepStatusIcon step={step} />
           </div>
 
-          <div className="min-w-0 flex items-center gap-1 text-[15px] font-medium leading-6">
+          <div className="flex min-w-0 items-center gap-1 text-[15px] font-medium leading-6">
             <span className="truncate">{step.title}</span>
             {hasDetail ? (
               <span className="shrink-0 text-[rgba(32,33,35,0.42)]">
@@ -158,7 +158,7 @@ export function RunStepsPanel({
 }) {
   const [uncontrolledExpanded, setUncontrolledExpanded] = useState(defaultExpanded);
   const expanded = expandedProp ?? uncontrolledExpanded;
-  const headerLabel = useMemo(() => statusLabel(status, steps.length), [status, steps.length]);
+  const headerLabel = statusLabel(status, steps.length);
   const hasVisibleBody = loading || Boolean(error) || steps.length > 0;
 
   if (!hasVisibleBody) {

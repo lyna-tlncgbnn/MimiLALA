@@ -1,4 +1,4 @@
-﻿import type { ToolCallPayload } from "@/shared/api/api";
+import type { ToolCallPayload } from "@/features/chat/api/chat-schemas";
 
 export function getToolCallName(toolCall: ToolCallPayload) {
   return typeof toolCall.name === "string" && toolCall.name.trim() ? toolCall.name : "unknown_tool";
@@ -47,4 +47,3 @@ function formatToolCallValue(value: unknown): string {
     return String(value);
   }
 }
-

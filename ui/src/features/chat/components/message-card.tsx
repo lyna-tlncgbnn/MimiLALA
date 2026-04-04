@@ -1,12 +1,10 @@
-﻿import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Copy, Hammer, Search, Sparkles } from "lucide-react";
 
-import {
-  formatToolCallLine,
-} from "@/features/chat/components/message-body-utils";
+import type { ToolCallPayload } from "@/features/chat/api/chat-schemas";
+import { formatToolCallLine } from "@/features/chat/components/message-body-utils";
 import { StandardMessageBody } from "@/features/chat/components/standard-message-body";
 import { ToolMessageBody } from "@/features/chat/components/tool-message-body";
-import type { ToolCallPayload } from "@/shared/api/api";
 import { cn } from "@/shared/lib/utils";
 
 const STANDARD_COLLAPSE_MAX_HEIGHT = 240;
@@ -257,4 +255,3 @@ export const MessageCard = memo(MessageCardInner, (previousProps, nextProps) => 
     areToolCallsEqual(previousProps.toolCalls ?? [], nextProps.toolCalls ?? [])
   );
 });
-

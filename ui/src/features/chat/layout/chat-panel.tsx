@@ -1,4 +1,4 @@
-import type { ChatMessage, RunSummary } from "@/shared/api/api";
+import type { ChatMessage, RunSummary } from "@/features/chat/api/chat-schemas";
 import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ConversationRunList } from "@/features/chat/components/conversation-run-list";
 import type { ActiveRunState } from "@/features/chat/types";

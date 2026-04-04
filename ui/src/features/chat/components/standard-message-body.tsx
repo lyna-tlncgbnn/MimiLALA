@@ -1,11 +1,11 @@
-﻿import { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
+import type { ToolCallPayload } from "@/features/chat/api/chat-schemas";
 import { MessageContent } from "@/features/chat/components/message-content";
 import {
   formatToolCallArgs,
   getToolCallName,
 } from "@/features/chat/components/message-body-utils";
-import type { ToolCallPayload } from "@/shared/api/api";
 import { cn } from "@/shared/lib/utils";
 
 export function StandardMessageBody({
@@ -103,4 +103,3 @@ export function StandardMessageBody({
     </div>
   );
 }
-

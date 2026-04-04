@@ -42,7 +42,7 @@ export function SidebarPanel({
   const isResizingRef = useRef(false);
 
   useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
+    function handlePointerDown(event: PointerEvent) {
       const target = event.target;
       if (!(target instanceof HTMLElement)) {
         return;
@@ -53,7 +53,7 @@ export function SidebarPanel({
       }
 
       setOpenMenuId(null);
-    };
+    }
 
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
@@ -68,7 +68,7 @@ export function SidebarPanel({
       return undefined;
     }
 
-    const handlePointerMove = (event: PointerEvent) => {
+    function handlePointerMove(event: PointerEvent) {
       if (!isResizingRef.current) {
         return;
       }
@@ -77,9 +77,9 @@ export function SidebarPanel({
       onSidebarWidthChange(nextWidth);
       document.body.style.userSelect = "none";
       document.body.style.cursor = "col-resize";
-    };
+    }
 
-    const stopResizing = () => {
+    function stopResizing() {
       if (!isResizingRef.current) {
         return;
       }
@@ -87,7 +87,7 @@ export function SidebarPanel({
       isResizingRef.current = false;
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
-    };
+    }
 
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", stopResizing);
